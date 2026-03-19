@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import ImageUploader from "@/components/ImageUploader";
 import ResultsPanel from "@/components/ResultsPanel";
 import PlaceInfo from "@/components/PlaceInfo";
+import ExamplePlaces from "@/components/ExamplePlaces";
 import { GeoResult, AnalysisState } from "@/types";
 import { getPlaceInfo, WikiInfo } from "@/lib/wikipedia";
 import { compressImageForUpload } from "@/lib/compress";
@@ -47,10 +48,12 @@ export default function HomePage() {
   useEffect(() => {
     if (!result || analysisState !== "done") return;
     setWikiInfo(null);
+    let active = true;
     const { landmark, city, country, confidence } = result.location;
-    getPlaceInfo(landmark, city, country, confidence).then((info) => {
-      if (info) setWikiInfo(info);
-    });
+    getPlaceInfo(landmark, city, country, confidence)
+      .then((info) => { if (active && info) setWikiInfo(info); })
+      .catch(() => { /* non-critical */ });
+    return () => { active = false; };
   }, [result, analysisState]);
 
   const handleAnalyze = useCallback(async (file: File) => {
@@ -198,6 +201,9 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
+
+            {/* Scrolling example places */}
+            <ExamplePlaces />
           </div>
         )}
 

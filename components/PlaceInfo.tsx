@@ -63,19 +63,25 @@ export default function PlaceInfo({ info, coordinates, country }: PlaceInfoProps
   const [loadingCountry, setLoadingCountry] = useState(true);
 
   useEffect(() => {
+    let active = true;
     setLoadingWeather(true);
     getWeatherData(coordinates.lat, coordinates.lng).then((w) => {
+      if (!active) return;
       setWeather(w);
       setLoadingWeather(false);
-    });
+    }).catch(() => { if (active) setLoadingWeather(false); });
+    return () => { active = false; };
   }, [coordinates.lat, coordinates.lng]);
 
   useEffect(() => {
+    let active = true;
     setLoadingCountry(true);
     getCountryData(country).then((c) => {
+      if (!active) return;
       setCountryData(c);
       setLoadingCountry(false);
-    });
+    }).catch(() => { if (active) setLoadingCountry(false); });
+    return () => { active = false; };
   }, [country]);
 
   return (

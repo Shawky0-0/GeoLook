@@ -14,6 +14,7 @@ async function geocodeWithPhoton(
 
     const response = await fetch(url.toString(), {
       headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(5000),
     });
     if (!response.ok) return null;
 
@@ -43,6 +44,7 @@ async function geocodeWithNominatim(
 
     const response = await fetch(url.toString(), {
       headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+      signal: AbortSignal.timeout(5000),
     });
     if (!response.ok) return null;
 
@@ -96,6 +98,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 
     const response = await fetch(url.toString(), {
       headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+      signal: AbortSignal.timeout(5000),
     });
     if (!response.ok) return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 
