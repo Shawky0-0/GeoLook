@@ -45,7 +45,7 @@ export default function Header() {
             </div>
 
             <a
-              href="https://github.com"
+              href="https://github.com/Shawky0-0/GeoLook"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center w-8 h-8 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-all duration-200"

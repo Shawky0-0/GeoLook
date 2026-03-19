@@ -348,7 +348,7 @@ export default function HomePage() {
             GeoLook — AI Geographic Intelligence
           </p>
           <p className="text-xs text-zinc-800">
-            Powered by OpenRouter · Maps by OpenStreetMap & Google
+            Powered by Shawky
           </p>
         </div>
       </footer>
