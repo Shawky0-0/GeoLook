@@ -113,18 +113,24 @@ async function callOpenRouter(
   const dataUrl = `data:${mimeType};base64,${imageBase64}`;
   const { systemPrompt, userMessage } = buildGeoPrompt(dataUrl);
 
-  const body = {
+  // Reasoning models (o1, o3, o4) don't support temperature or system role
+  const isReasoningModel = /\/(o1|o3|o4|o\d)/.test(model);
+
+  const messages = isReasoningModel
+    ? [{ role: "user", content: [{ type: "text", text: systemPrompt }, ...userMessage] }]
+    : [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }];
+
+  const body: Record<string, unknown> = {
     model,
-    messages: [
-      { role: "system", content: systemPrompt },
-      {
-        role: "user",
-        content: userMessage,
-      },
-    ],
-    max_tokens: 1500,
-    temperature: 0.1,
+    messages,
+    max_completion_tokens: 2000,
   };
+
+  if (!isReasoningModel) {
+    body.temperature = 0.1;
+    body.max_tokens = 2000;
+    delete body.max_completion_tokens;
+  }
 
   const response = await fetch(OPENROUTER_BASE_URL, {
     method: "POST",
