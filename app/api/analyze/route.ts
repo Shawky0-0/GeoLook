@@ -10,6 +10,8 @@ const ALLOWED_MIME_TYPES = [
   "image/png",
   "image/webp",
   "image/gif",
+  "image/heic",
+  "image/heif",
 ];
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_DIMENSION = 1536;
@@ -34,7 +36,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
       return NextResponse.json(
         {
-          error: `Unsupported file type: ${mimeType}. Please upload a JPEG, PNG, WebP, or GIF image.`,
+          error: `Unsupported file type: ${mimeType}. Please upload a JPEG, PNG, WebP, GIF, or HEIC image.`,
         },
         { status: 400 }
       );
