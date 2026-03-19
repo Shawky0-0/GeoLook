@@ -9,6 +9,7 @@ import ResultsPanel from "@/components/ResultsPanel";
 import PlaceInfo from "@/components/PlaceInfo";
 import { GeoResult, AnalysisState } from "@/types";
 import { getPlaceInfo, WikiInfo } from "@/lib/wikipedia";
+import { compressImageForUpload } from "@/lib/compress";
 
 const MapView = dynamic(() => import("@/components/MapView"), {
   ssr: false,
@@ -67,8 +68,9 @@ export default function HomePage() {
     }, 2000);
 
     try {
+      const compressed = await compressImageForUpload(file);
       const formData = new FormData();
-      formData.append("image", file);
+      formData.append("image", compressed);
       const response = await fetch("/api/analyze", { method: "POST", body: formData });
       const rawResponse = await response.text();
       let parsedData: Record<string, unknown> | null = null;
