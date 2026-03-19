@@ -159,7 +159,7 @@ export default function HomePage() {
       <div className="geo-grid absolute inset-0 pointer-events-none" />
 
       {/* ── Vignette edges ── */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(9,9,11,0.8)_100%)] pointer-events-none" />
+      <div className="vignette-overlay absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(9,9,11,0.8)_100%)] pointer-events-none" />
 
       <Header />
 

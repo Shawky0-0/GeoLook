@@ -137,7 +137,7 @@ function PlaceCard({
   return (
     <div
       className={`
-        shrink-0 w-48 rounded-2xl border border-white/10 overflow-hidden mx-2
+        place-card-dark shrink-0 w-48 rounded-2xl border border-white/10 overflow-hidden mx-2
         bg-gradient-to-br ${place.gradient} shadow-xl
       `}
     >

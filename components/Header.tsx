@@ -1,6 +1,34 @@
 "use client";
 
 import Image from "next/image";
+import { useState, useEffect } from "react";
+import { Sun, Moon } from "lucide-react";
+
+function ThemeToggle() {
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    const saved = (localStorage.getItem("geolook-theme") || "dark") as "dark" | "light";
+    setTheme(saved);
+  }, []);
+
+  const toggle = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("geolook-theme", next);
+  };
+
+  return (
+    <button
+      onClick={toggle}
+      aria-label="Toggle theme"
+      className="flex items-center justify-center w-8 h-8 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all duration-200 border border-zinc-800 hover:border-zinc-600"
+    >
+      {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+    </button>
+  );
+}
 
 export default function Header() {
   return (
@@ -22,7 +50,7 @@ export default function Header() {
               alt="GeoLook"
               width={160}
               height={56}
-              className="relative object-contain drop-shadow-lg w-[120px] sm:w-[160px] h-auto"
+              className="logo-image relative object-contain drop-shadow-lg w-[120px] sm:w-[160px] h-auto"
               priority
             />
           </div>
@@ -43,6 +71,8 @@ export default function Header() {
               <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
               Vision AI
             </div>
+
+            <ThemeToggle />
 
             <a
               href="https://github.com/Shawky0-0/GeoLook"

@@ -15,6 +15,7 @@ import {
 import { clsx } from "clsx";
 import { GeoResult, AnalysisState } from "@/types";
 import ConfidenceBar from "./ConfidenceBar";
+import ConfidenceRing from "./ConfidenceRing";
 
 interface ResultsPanelProps {
   result: GeoResult | null;
@@ -216,15 +217,18 @@ export default function ResultsPanel({
             </div>
           </div>
 
-          {/* Confidence bar */}
-          <ConfidenceBar confidence={location.confidence} showLabel />
-
-          {/* Accuracy radius */}
-          <p className="text-xs text-zinc-600 mt-2">
-            Accuracy radius: ±{location.radius_km < 1
-              ? `${(location.radius_km * 1000).toFixed(0)}m`
-              : `${location.radius_km}km`}
-          </p>
+          {/* Confidence ring + accuracy */}
+          <div className="flex items-center gap-5 mt-2">
+            <ConfidenceRing confidence={location.confidence} size={88} />
+            <div className="flex-1 space-y-2">
+              <ConfidenceBar confidence={location.confidence} showLabel={false} size="sm" />
+              <p className="text-xs text-zinc-600">
+                Accuracy: ±{location.radius_km < 1
+                  ? `${(location.radius_km * 1000).toFixed(0)}m`
+                  : `${location.radius_km}km`}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 

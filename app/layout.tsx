@@ -36,10 +36,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body
-        className={`${inter.className} min-h-screen bg-zinc-950 text-zinc-50 antialiased`}
-      >
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Prevent flash: apply saved theme before first paint */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('geolook-theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){}})()` }} />
+      </head>
+      <body className={`${inter.className} min-h-screen antialiased`}>
         {children}
       </body>
     </html>
