@@ -43,14 +43,13 @@ export default function Header() {
         <div className="flex items-center justify-between h-16 sm:h-20">
 
           {/* Logo */}
-          <div className="relative flex items-center justify-center">
-            <div className="absolute inset-0 rounded-xl bg-blue-500/20 blur-md animate-glow-pulse" />
+          <div className="flex items-center justify-center">
             <Image
               src="/logo.png"
               alt="GeoLook"
               width={160}
               height={56}
-              className="logo-image relative object-contain drop-shadow-lg w-[120px] sm:w-[160px] h-auto"
+              className="logo-image object-contain w-[120px] sm:w-[160px] h-auto"
               priority
             />
           </div>

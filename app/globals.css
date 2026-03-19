@@ -508,10 +508,6 @@ div[style*="z-index:10000"][style*="background"] {
 /* ─── Light mode: divide color ─── */
 [data-theme="light"] .divide-white\/\[0\.04\] > * + * { border-color: rgba(0,0,0,0.07); }
 
-/* ─── Light mode: logo ─── */
-[data-theme="light"] .logo-image {
-  filter: invert(1) sepia(1) saturate(6) hue-rotate(215deg) brightness(0.85);
-}
 
 /* ─── Light mode: place cards stay dark (photo cards) ─── */
 [data-theme="light"] .place-card-dark .text-white { color: #ffffff; }
