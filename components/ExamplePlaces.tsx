@@ -50,7 +50,7 @@ const PLACES: Place[] = [
     lng: "139.7004° E",
     gradient: "from-rose-950 to-pink-950",
     accent: "#fb7185",
-    wikiTitle: "Shibuya crossing",
+    wikiTitle: "Shibuya Crossing",
   },
   {
     landmark: "Colosseum",
@@ -125,6 +125,15 @@ function PlaceCard({
 }) {
   const [imgLoaded, setImgLoaded] = useState(false);
 
+  useEffect(() => {
+    if (!photo) return;
+    setImgLoaded(false);
+    const img = new Image();
+    img.onload = () => setImgLoaded(true);
+    img.src = photo;
+    return () => { img.onload = null; };
+  }, [photo]);
+
   return (
     <div
       className={`
@@ -143,10 +152,12 @@ function PlaceCard({
           <img
             src={photo}
             alt={place.landmark}
+            loading="eager"
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
               imgLoaded ? "opacity-80" : "opacity-0"
             }`}
             onLoad={() => setImgLoaded(true)}
+            onError={() => setImgLoaded(false)}
           />
         )}
 
@@ -206,16 +217,13 @@ export default function ExamplePlaces() {
       PLACES.map(async (place) => {
         try {
           const res = await fetch(
-            `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(place.wikiTitle)}`,
-            { signal: AbortSignal.timeout(6000) }
+            `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(place.wikiTitle)}`
           );
           if (!res.ok) return null;
           const data = await res.json();
           const src = data?.thumbnail?.source as string | undefined;
           if (!src) return null;
-          // Request a larger thumbnail (800px wide)
-          const hd = src.replace(/\/\d+px-/, "/800px-");
-          return [place.landmark, hd] as [string, string];
+          return [place.landmark, src] as [string, string];
         } catch {
           return null;
         }
