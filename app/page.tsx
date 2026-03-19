@@ -1,12 +1,14 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { AlertCircle, RefreshCw, Sparkles, ScanSearch } from "lucide-react";
 import Header from "@/components/Header";
 import ImageUploader from "@/components/ImageUploader";
 import ResultsPanel from "@/components/ResultsPanel";
+import PlaceInfo from "@/components/PlaceInfo";
 import { GeoResult, AnalysisState } from "@/types";
+import { getPlaceInfo, WikiInfo } from "@/lib/wikipedia";
 
 const MapView = dynamic(() => import("@/components/MapView"), {
   ssr: false,
@@ -38,6 +40,17 @@ export default function HomePage() {
   const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedAltIndex, setSelectedAltIndex] = useState<number | undefined>(undefined);
+  const [wikiInfo, setWikiInfo] = useState<WikiInfo | null>(null);
+
+  // Fetch Wikipedia info whenever a result arrives
+  useEffect(() => {
+    if (!result || analysisState !== "done") return;
+    setWikiInfo(null);
+    const { landmark, city, country, confidence } = result.location;
+    getPlaceInfo(landmark, city, country, confidence).then((info) => {
+      if (info) setWikiInfo(info);
+    });
+  }, [result, analysisState]);
 
   const handleAnalyze = useCallback(async (file: File) => {
     setAnalysisState("analyzing");
@@ -114,6 +127,7 @@ export default function HomePage() {
     setErrorSuggestion(null);
     setMapCenter(null);
     setSelectedAltIndex(undefined);
+    setWikiInfo(null);
   }, []);
 
   const handleSelectAlternative = useCallback((lat: number, lng: number, index: number) => {
@@ -292,6 +306,13 @@ export default function HomePage() {
             />
           </div>
         ) : null}
+
+        {/* ════════════════ PLACE INFO (Wikipedia) ════════════════ */}
+        {wikiInfo && analysisState === "done" && (
+          <div className="mt-4">
+            <PlaceInfo info={wikiInfo} />
+          </div>
+        )}
 
         {/* ════════════════ FEATURE CARDS (idle only) ════════════════ */}
         {analysisState === "idle" && (
