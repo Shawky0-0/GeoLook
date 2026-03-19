@@ -307,10 +307,14 @@ export default function HomePage() {
           </div>
         ) : null}
 
-        {/* ════════════════ PLACE INFO (Wikipedia) ════════════════ */}
-        {wikiInfo && analysisState === "done" && (
+        {/* ════════════════ PLACE INFO (Wikipedia + Live Data) ════════════════ */}
+        {wikiInfo && analysisState === "done" && result && (
           <div className="mt-4">
-            <PlaceInfo info={wikiInfo} />
+            <PlaceInfo
+              info={wikiInfo}
+              coordinates={result.location.coordinates}
+              country={result.location.country}
+            />
           </div>
         )}
 
