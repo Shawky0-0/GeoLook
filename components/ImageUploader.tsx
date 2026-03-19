@@ -77,7 +77,7 @@ export default function ImageUploader({ onAnalyze, isAnalyzing }: ImageUploaderP
 
   const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
     onDrop,
-    accept: { "image/jpeg": [".jpg", ".jpeg"], "image/png": [".png"], "image/webp": [".webp"], "image/gif": [".gif"] },
+    accept: { "image/jpeg": [".jpg", ".jpeg"], "image/png": [".png"], "image/webp": [".webp"], "image/gif": [".gif"], "image/heic": [".heic"], "image/heif": [".heif"] },
     maxSize: 20 * 1024 * 1024,
     multiple: false,
     disabled: isAnalyzing,
@@ -172,7 +172,7 @@ export default function ImageUploader({ onAnalyze, isAnalyzing }: ImageUploaderP
               {isDragActive ? "Release to scan" : isDragReject ? "File not supported" : "Drop image to scan"}
             </p>
             <p className="text-xs text-zinc-600">
-              {isDragReject ? "Use JPEG, PNG, WebP or GIF" : "or click to browse · max 20MB"}
+              {isDragReject ? "Use JPEG, PNG, WebP, GIF or HEIC" : "or click to browse · max 20MB"}
             </p>
 
             {/* Scan line on drag */}

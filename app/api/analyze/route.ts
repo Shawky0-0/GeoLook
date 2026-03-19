@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
+
+export const maxDuration = 60;
 import { extractExifData } from "@/lib/exif-extractor";
 import { analyzeImageWithOpenRouter } from "@/lib/openrouter";
 import { geocodePlace } from "@/lib/geocoding";
