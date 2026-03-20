@@ -12,9 +12,27 @@ interface MapillaryPanelProps {
 type Status = "loading" | "loaded" | "no-coverage" | "error";
 
 type MapillaryImage = { id: string; geometry?: { coordinates: [number, number] } };
-type SearchResult = { id: string; dist: number };
+type SearchResult = { id: string; dist: number; iLat: number; iLng: number };
+type ImageResult  = { id: string; iLat: number; iLng: number };
 
-/** Fetch up to 25 images in an expanding bbox and return the closest one with its distance. */
+/** Compass bearing (0–360°, 0=North) from one point to another. */
+function bearingTo(fromLat: number, fromLng: number, toLat: number, toLng: number): number {
+  const φ1 = fromLat * Math.PI / 180, φ2 = toLat * Math.PI / 180;
+  const Δλ = (toLng - fromLng) * Math.PI / 180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+/** Haversine distance in metres between two lat/lng points. */
+function distMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180, Δλ = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 async function fetchBest(
   lat: number, lng: number, token: string,
   deltas: number[], isPano: boolean
@@ -29,45 +47,43 @@ async function fetchBest(
       );
       const images: MapillaryImage[] = (await res.json())?.data ?? [];
       if (!images.length) continue;
-      let best = images[0], bestDist = Infinity;
+      let best = images[0], bestDist = Infinity, bestLat = 0, bestLng = 0;
       for (const img of images) {
         if (!img.geometry) continue;
         const [iLng, iLat] = img.geometry.coordinates;
         const dist = (iLat - lat) ** 2 + (iLng - lng) ** 2;
-        if (dist < bestDist) { bestDist = dist; best = img; }
+        if (dist < bestDist) { bestDist = dist; best = img; bestLat = iLat; bestLng = iLng; }
       }
-      return { id: best.id, dist: bestDist === Infinity ? 0 : bestDist };
+      return { id: best.id, dist: bestDist === Infinity ? 0 : bestDist, iLat: bestLat, iLng: bestLng };
     } catch { /* try next delta */ }
   }
   return null;
 }
 
-async function findNearestImageId(lat: number, lng: number, token: string): Promise<string | null> {
-  // Run both searches in parallel:
-  // • pano search: expanding up to 5 km
-  // • close-any search: only very near the target (≤ 0.004° ≈ 450 m)
+async function findNearestImage(lat: number, lng: number, token: string): Promise<ImageResult | null> {
   const [pano, close] = await Promise.all([
     fetchBest(lat, lng, token, [0.001, 0.003, 0.008, 0.02, 0.05], true),
     fetchBest(lat, lng, token, [0.001, 0.002, 0.004], false),
   ]);
 
+  let chosen: SearchResult | null = null;
   if (pano && close) {
-    // Prefer panoramic unless a regular photo is 5× closer in actual distance
-    // (dist is squared, so 5× real distance → 25× dist²)
-    return Math.sqrt(close.dist) * 5 < Math.sqrt(pano.dist) ? close.id : pano.id;
+    chosen = Math.sqrt(close.dist) * 5 < Math.sqrt(pano.dist) ? close : pano;
+  } else {
+    chosen = pano ?? close;
   }
+  if (chosen) return { id: chosen.id, iLat: chosen.iLat, iLng: chosen.iLng };
 
-  if (pano) return pano.id;
-  if (close) return close.id;
-
-  // Last resort: any image at larger radius
   const fallback = await fetchBest(lat, lng, token, [0.01, 0.05], false);
-  return fallback?.id ?? null;
+  return fallback ? { id: fallback.id, iLat: fallback.iLat, iLng: fallback.iLng } : null;
 }
 
 export default function MapillaryPanel({ lat, lng, locationLabel }: MapillaryPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<Status>("loading");
+  const [targetBearing, setTargetBearing] = useState<number | null>(null);
+  const [distM, setDistM] = useState(0);
+  const [viewBearing, setViewBearing] = useState(0);
 
   useEffect(() => {
     const token = process.env.NEXT_PUBLIC_MAPILLARY_TOKEN;
@@ -78,20 +94,23 @@ export default function MapillaryPanel({ lat, lng, locationLabel }: MapillaryPan
     let viewer: any = null;
 
     setStatus("loading");
+    setTargetBearing(null);
+    setViewBearing(0);
 
     (async () => {
       try {
-        const imageId = await findNearestImageId(lat, lng, token);
+        const imgResult = await findNearestImage(lat, lng, token);
         if (cancelled) return;
+        if (!imgResult) { setStatus("no-coverage"); return; }
 
-        if (!imageId) { setStatus("no-coverage"); return; }
+        const { id: imageId, iLat, iLng } = imgResult;
+        const bearing = bearingTo(iLat, iLng, lat, lng);
+        const dist = distMeters(iLat, iLng, lat, lng);
 
         const { Viewer } = await import("mapillary-js");
         if (cancelled || !containerRef.current) return;
 
-        // Clear any previous content
         containerRef.current.innerHTML = "";
-
         viewer = new Viewer({
           accessToken: token,
           container: containerRef.current,
@@ -99,18 +118,25 @@ export default function MapillaryPanel({ lat, lng, locationLabel }: MapillaryPan
           component: { cover: false, attribution: true },
         });
 
-        // Force correct dimensions after mount
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            if (!cancelled) {
-              try { viewer?.resize(); } catch { /* ignore */ }
-            }
+            if (!cancelled) { try { viewer?.resize(); } catch { /* ignore */ } }
           });
         });
 
-        const markLoaded = () => { if (!cancelled) setStatus("loaded"); };
-        viewer.on("load", markLoaded);   // fires once when viewer fully initialises
-        viewer.on("image", markLoaded);  // fires on forward/back navigation
+        const markLoaded = () => {
+          if (!cancelled) {
+            setStatus("loaded");
+            // Show arrow only when image spawned more than 20 m from target
+            if (dist > 20) { setTargetBearing(bearing); setDistM(dist); }
+          }
+        };
+        viewer.on("load", markLoaded);
+        viewer.on("image", markLoaded);
+
+        // Keep arrow synced with current viewing direction
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        viewer.on("bearing", (e: any) => { if (!cancelled) setViewBearing(e.bearing ?? 0); });
 
       } catch {
         if (!cancelled) setStatus("error");
@@ -125,25 +151,25 @@ export default function MapillaryPanel({ lat, lng, locationLabel }: MapillaryPan
 
   const mapillaryUrl = `https://www.mapillary.com/app/?lat=${lat}&lng=${lng}&z=17`;
 
+  // Arrow rotation relative to where user is currently looking
+  const arrowAngle = targetBearing !== null ? ((targetBearing - viewBearing + 360) % 360) : null;
+  const distLabel = distM < 1000 ? `${Math.round(distM)} m` : `${(distM / 1000).toFixed(1)} km`;
+
   return (
     <div className="absolute inset-0 bg-zinc-950">
 
-      {/* Mapillary container — always mounted so Viewer can measure dimensions */}
+      {/* Mapillary container — always in DOM so Viewer measures real dimensions */}
       <div
         ref={containerRef}
         style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          // Hide visually until loaded, but keep in layout so Viewer can measure
+          position: "absolute", inset: 0, width: "100%", height: "100%",
           opacity: status === "loaded" ? 1 : 0,
           pointerEvents: status === "loaded" ? "auto" : "none",
           transition: "opacity 0.5s",
         }}
       />
 
-      {/* Loading overlay */}
+      {/* Loading */}
       {status === "loading" && (
         <div className="absolute inset-0 z-10 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
@@ -162,12 +188,11 @@ export default function MapillaryPanel({ lat, lng, locationLabel }: MapillaryPan
           <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900/70 backdrop-blur-md p-6 text-center">
             <div className="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mx-auto mb-4">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="10" r="3"/>
-                <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 14 8 14s8-8.75 8-14a8 8 0 0 0-8-8z"/>
+                <circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 14 8 14s8-8.75 8-14a8 8 0 0 0-8-8z"/>
               </svg>
             </div>
             <h3 className="text-sm font-semibold text-zinc-100 mb-1">No street imagery nearby</h3>
-            <p className="text-xs text-zinc-500 mb-4">Mapillary has no photos within 5km of this location.</p>
+            <p className="text-xs text-zinc-500 mb-4">Mapillary has no photos within 5 km of this location.</p>
             <a href={mapillaryUrl} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
               Browse on Mapillary
@@ -188,7 +213,7 @@ export default function MapillaryPanel({ lat, lng, locationLabel }: MapillaryPan
         </div>
       )}
 
-      {/* Top badge when loaded */}
+      {/* Top badge */}
       {status === "loaded" && (
         <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between pointer-events-none">
           <div className="inline-flex items-center gap-1.5 bg-zinc-950/80 border border-violet-500/25 backdrop-blur-sm px-2.5 py-1 rounded-full">
@@ -203,7 +228,53 @@ export default function MapillaryPanel({ lat, lng, locationLabel }: MapillaryPan
         </div>
       )}
 
-      {/* Hint when loaded */}
+      {/* ── Directional target arrow ── */}
+      {status === "loaded" && arrowAngle !== null && (
+        <div
+          className="absolute z-10 pointer-events-none"
+          style={{ bottom: 44, left: "50%", transform: "translateX(-50%)" }}
+        >
+          <div style={{
+            background: "rgba(9,9,11,0.88)",
+            border: "1.5px solid rgba(139,92,246,0.5)",
+            backdropFilter: "blur(10px)",
+            borderRadius: 14,
+            padding: "6px 12px 8px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 3,
+            boxShadow: "0 4px 24px rgba(139,92,246,0.2)",
+          }}>
+            {/* Rotating arrow */}
+            <div style={{
+              transform: `rotate(${arrowAngle}deg)`,
+              transition: "transform 0.12s ease-out",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 32,
+              height: 32,
+            }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                {/* Arrow pointing up = toward target */}
+                <path d="M12 3L5 20l7-5 7 5L12 3z" fill="#a78bfa" />
+              </svg>
+            </div>
+            {/* Label */}
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="#a78bfa">
+                <circle cx="12" cy="10" r="4"/><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 14 8 14s8-8.75 8-14a8 8 0 0 0-8-8z"/>
+              </svg>
+              <span style={{ fontSize: 9, fontWeight: 700, color: "#a78bfa", letterSpacing: "0.08em" }}>
+                TARGET {distLabel} away
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hint */}
       {status === "loaded" && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
           <div className="bg-zinc-950/70 backdrop-blur-sm border border-zinc-800 px-3 py-1 rounded-full">
