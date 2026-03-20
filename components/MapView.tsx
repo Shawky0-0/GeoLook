@@ -10,7 +10,7 @@ import Map, {
 import type { MapRef } from "react-map-gl/maplibre";
 import type { StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import StreetViewPanel from "./StreetViewPanel";
+import MapillaryPanel from "./MapillaryPanel";
 import { GeoResult, AnalysisState } from "@/types";
 
 // Famous world locations to fly through during AI scan
@@ -28,8 +28,6 @@ const SCAN_LOCATIONS = [
   { lng: 12.492,  lat: 41.890,  zoom: 11, label: "Mediterranean"},  // Rome
   { lng: -58.381, lat: -34.603, zoom: 10, label: "S. Atlantic"  },  // Buenos Aires
 ];
-
-const EMBEDDED_STREET_VIEW_ENABLED = true;
 
 function rasterStyle(tileUrl: string, attribution: string): StyleSpecification {
   return {
@@ -130,9 +128,6 @@ export default function MapView({ result, state }: MapViewProps) {
   const [scanLabel, setScanLabel] = useState("");
   const [scanCoords, setScanCoords] = useState({ lat: 0, lng: 0 });
 
-  const canUseEmbeddedStreetView =
-    EMBEDDED_STREET_VIEW_ENABLED && Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY);
-
   // ── Globe-scanning animation during analysis ──
   useEffect(() => {
     if (state !== "analyzing") {
@@ -215,8 +210,6 @@ export default function MapView({ result, state }: MapViewProps) {
   const lng = result?.location.coordinates.lng ?? 0;
   const zoom = result ? getZoomFromRadius(result.location.radius_km) : 2;
   const googleMapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
-  const streetViewOpenUrl = `https://www.google.com/maps/@${lat},${lng},3a,75y,0h,90t/data=!3m1!1e3`;
-  const mapillaryUrl = `https://www.mapillary.com/app/?lat=${lat}&lng=${lng}&z=17`;
   const locationLabel = result
     ? [result.location.landmark, result.location.city, result.location.country].filter(Boolean).join(", ")
     : "";
@@ -566,43 +559,9 @@ export default function MapView({ result, state }: MapViewProps) {
           `}</style>
         </div>
 
-        {/* STREET VIEW */}
+        {/* MAPILLARY STREET VIEW */}
         {activeView === "streetview" && result && (
-          canUseEmbeddedStreetView ? (
-            <StreetViewPanel
-              lat={lat}
-              lng={lng}
-              locationLabel={locationLabel}
-              streetViewOpenUrl={streetViewOpenUrl}
-            />
-          ) : (
-            <div className="absolute inset-0 flex flex-col bg-zinc-950">
-              <div className="flex-1 flex items-center justify-center p-6">
-                <div className="w-full max-w-xl rounded-2xl border border-zinc-800 bg-zinc-900/70 backdrop-blur-md p-6 text-center">
-                  <div className="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mx-auto mb-4">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="10" r="3"/>
-                      <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 14 8 14s8-8.75 8-14a8 8 0 0 0-8-8z"/>
-                    </svg>
-                  </div>
-                  <h3 className="text-base font-semibold text-zinc-100 mb-2">Street View</h3>
-                  <p className="text-sm text-zinc-400 mb-5">
-                    Open the detected location directly in Google Street View or Mapillary.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
-                    <a href={streetViewOpenUrl} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
-                      Open Google Street View
-                    </a>
-                    <a href={mapillaryUrl} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors border border-zinc-700">
-                      Open Mapillary
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
+          <MapillaryPanel lat={lat} lng={lng} locationLabel={locationLabel} />
         )}
       </div>
     </div>
