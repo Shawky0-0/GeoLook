@@ -45,7 +45,7 @@ async function fetchNearby(lat: number, lng: number): Promise<NearbyPlace[]> {
     })
   );
 
-  return summaries.filter((s): s is NearbyPlace => s !== null);
+  return summaries.filter((s) => s !== null) as NearbyPlace[];
 }
 
 function formatDist(m: number): string {
