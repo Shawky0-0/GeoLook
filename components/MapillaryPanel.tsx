@@ -13,7 +13,23 @@ type Status = "loading" | "loaded" | "no-coverage" | "error";
 
 async function findNearestImageId(lat: number, lng: number, token: string): Promise<string | null> {
   const deltas = [0.003, 0.008, 0.02, 0.05];
+
+  // First pass: 360° panoramic images only
   for (const d of deltas) {
+    const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
+    try {
+      const res = await fetch(
+        `https://graph.mapillary.com/images?fields=id&bbox=${bbox}&limit=1&is_pano=true&access_token=${token}`,
+        { signal: AbortSignal.timeout(6000) }
+      );
+      const data = await res.json();
+      const id = data?.data?.[0]?.id as string | undefined;
+      if (id) return id;
+    } catch { /* try next delta */ }
+  }
+
+  // Second pass: any image as fallback (larger search radius)
+  for (const d of [0.05, 0.1, 0.2]) {
     const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
     try {
       const res = await fetch(
@@ -25,6 +41,7 @@ async function findNearestImageId(lat: number, lng: number, token: string): Prom
       if (id) return id;
     } catch { /* try next delta */ }
   }
+
   return null;
 }
 
