@@ -329,45 +329,92 @@ export default function HomePage() {
 
         {/* ════════════════ FEATURE CARDS (idle only) ════════════════ */}
         {analysisState === "idle" && (
-          <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-xl mx-auto animate-fade-up">
+          <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto animate-fade-up">
             {[
               {
-                icon: "🏛️",
-                title: "Architecture Analysis",
-                desc: "Identifies building styles, urban patterns, and construction eras",
-                topBar: "from-blue-500 via-cyan-400 to-blue-400",
-                iconBg: "bg-blue-500/10 border-blue-500/20",
-                hover: "hover:border-blue-500/30 hover:shadow-blue-500/10",
+                accent: "from-blue-500 to-cyan-400",
+                glow: "59,130,246",
+                iconPath: (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 10v4M12 10v4M16 10v4"/>
+                  </svg>
+                ),
+                title: "Architecture",
+                subtitle: "Building Intelligence",
+                points: ["Building styles & eras", "Urban layout patterns", "Construction materials"],
+                iconColor: "rgba(59,130,246,0.12)",
+                borderColor: "rgba(59,130,246,0.18)",
               },
               {
-                icon: "🔍",
-                title: "Visual Cue Detection",
-                desc: "Reads signs, plates, vegetation, climate, and cultural markers",
-                topBar: "from-violet-500 via-purple-500 to-pink-400",
-                iconBg: "bg-violet-500/10 border-violet-500/20",
-                hover: "hover:border-violet-500/30 hover:shadow-violet-500/10",
+                accent: "from-violet-500 to-pink-400",
+                glow: "139,92,246",
+                iconPath: (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M11 8v6M8 11h6"/>
+                  </svg>
+                ),
+                title: "Visual Cues",
+                subtitle: "Signs & Culture",
+                points: ["Street signs & plates", "Vegetation & climate", "Cultural markers"],
+                iconColor: "rgba(139,92,246,0.12)",
+                borderColor: "rgba(139,92,246,0.18)",
               },
               {
-                icon: "📍",
+                accent: "from-emerald-500 to-teal-400",
+                glow: "16,185,129",
+                iconPath: (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 14 8 14s8-8.75 8-14a8 8 0 0 0-8-8z"/>
+                  </svg>
+                ),
                 title: "Live Map Pin",
-                desc: "Places result on an interactive map with accuracy radius",
-                topBar: "from-cyan-500 via-teal-400 to-emerald-400",
-                iconBg: "bg-cyan-500/10 border-cyan-500/20",
-                hover: "hover:border-cyan-500/30 hover:shadow-cyan-500/10",
+                subtitle: "Geolocation Output",
+                points: ["GPS coordinates", "Accuracy radius", "Street-level view"],
+                iconColor: "rgba(16,185,129,0.12)",
+                borderColor: "rgba(16,185,129,0.18)",
               },
             ].map((f, i) => (
               <div
                 key={f.title}
-                className={`glass-card rounded-2xl overflow-hidden text-center group ${f.hover} transition-all duration-300 hover:shadow-lg`}
-                style={{ animationDelay: `${i * 100}ms` }}
+                className="group relative rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1"
+                style={{
+                  background: "rgba(24,24,27,0.7)",
+                  border: `1px solid ${f.borderColor}`,
+                  boxShadow: `0 0 0 0 rgba(${f.glow},0)`,
+                  animationDelay: `${i * 100}ms`,
+                }}
+                onMouseEnter={e => (e.currentTarget.style.boxShadow = `0 8px 32px rgba(${f.glow},0.18)`)}
+                onMouseLeave={e => (e.currentTarget.style.boxShadow = `0 0 0 0 rgba(${f.glow},0)`)}
               >
-                <div className={`h-[2px] bg-gradient-to-r ${f.topBar}`} />
+                {/* Gradient accent bar */}
+                <div className={`h-[2px] bg-gradient-to-r ${f.accent}`} />
+
+                {/* Subtle inner glow */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+                  style={{ background: `radial-gradient(ellipse at 50% 0%, rgba(${f.glow},0.08) 0%, transparent 70%)` }} />
+
                 <div className="p-5">
-                  <div className={`inline-flex items-center justify-center w-12 h-12 rounded-2xl border ${f.iconBg} mb-3 group-hover:scale-110 transition-transform duration-300`}>
-                    <span className="text-2xl">{f.icon}</span>
+                  {/* Icon */}
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300"
+                      style={{ background: f.iconColor, border: `1px solid ${f.borderColor}` }}>
+                      {f.iconPath}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-zinc-100 leading-tight">{f.title}</p>
+                      <p className="text-[10px] text-zinc-500 leading-tight mt-0.5">{f.subtitle}</p>
+                    </div>
                   </div>
-                  <h3 className="text-sm font-semibold text-zinc-200 mb-1">{f.title}</h3>
-                  <p className="text-xs text-zinc-600 leading-relaxed">{f.desc}</p>
+
+                  {/* Capability list */}
+                  <ul className="space-y-1.5">
+                    {f.points.map(pt => (
+                      <li key={pt} className="flex items-center gap-2">
+                        <div className={`w-1 h-1 rounded-full bg-gradient-to-r ${f.accent} shrink-0`} />
+                        <span className="text-[11px] text-zinc-400">{pt}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             ))}
