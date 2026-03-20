@@ -11,33 +11,46 @@ interface MapillaryPanelProps {
 
 type Status = "loading" | "loaded" | "no-coverage" | "error";
 
-async function findNearestImageId(lat: number, lng: number, token: string): Promise<string | null> {
-  const deltas = [0.003, 0.008, 0.02, 0.05];
+type MapillaryImage = { id: string; geometry?: { coordinates: [number, number] } };
 
-  // First pass: 360° panoramic images only
-  for (const d of deltas) {
+function closestImage(images: MapillaryImage[], lat: number, lng: number): string | null {
+  if (!images.length) return null;
+  let best = images[0];
+  let bestDist = Infinity;
+  for (const img of images) {
+    if (!img.geometry) continue;
+    const [iLng, iLat] = img.geometry.coordinates;
+    const d = (iLat - lat) ** 2 + (iLng - lng) ** 2;
+    if (d < bestDist) { bestDist = d; best = img; }
+  }
+  return best.id;
+}
+
+async function findNearestImageId(lat: number, lng: number, token: string): Promise<string | null> {
+  // First pass: 360° panoramic images only — fetch 10, pick closest
+  for (const d of [0.003, 0.008, 0.02, 0.05]) {
     const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
     try {
       const res = await fetch(
-        `https://graph.mapillary.com/images?fields=id&bbox=${bbox}&limit=1&is_pano=true&access_token=${token}`,
+        `https://graph.mapillary.com/images?fields=id,geometry&bbox=${bbox}&limit=10&is_pano=true&access_token=${token}`,
         { signal: AbortSignal.timeout(6000) }
       );
       const data = await res.json();
-      const id = data?.data?.[0]?.id as string | undefined;
+      const id = closestImage(data?.data ?? [], lat, lng);
       if (id) return id;
     } catch { /* try next delta */ }
   }
 
-  // Second pass: any image as fallback (larger search radius)
+  // Second pass: any image as fallback
   for (const d of [0.05, 0.1, 0.2]) {
     const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
     try {
       const res = await fetch(
-        `https://graph.mapillary.com/images?fields=id&bbox=${bbox}&limit=1&access_token=${token}`,
+        `https://graph.mapillary.com/images?fields=id,geometry&bbox=${bbox}&limit=10&access_token=${token}`,
         { signal: AbortSignal.timeout(6000) }
       );
       const data = await res.json();
-      const id = data?.data?.[0]?.id as string | undefined;
+      const id = closestImage(data?.data ?? [], lat, lng);
       if (id) return id;
     } catch { /* try next delta */ }
   }
