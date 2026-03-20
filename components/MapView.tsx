@@ -35,20 +35,31 @@ const TILE_LAYERS = {
     url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
     subdomains: "abcd",
+    maxNativeZoom: 19,
   },
   satellite: {
     label: "Satellite",
     emoji: "🛰️",
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attribution: "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS",
+    attribution: "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, USGS Aerial Photography",
     subdomains: "",
+    maxNativeZoom: 19,
   },
   street: {
     label: "Street",
     emoji: "🗺️",
-    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    subdomains: "abc",
+    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: "abcd",
+    maxNativeZoom: 19,
+  },
+  terrain: {
+    label: "Terrain",
+    emoji: "🏔️",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+    attribution: "Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong)",
+    subdomains: "",
+    maxNativeZoom: 19,
   },
 } as const;
 
@@ -173,7 +184,12 @@ interface MapViewProps {
 }
 
 export default function MapView({ result }: MapViewProps) {
-  const [activeLayer, setActiveLayer] = useState<TileLayerKey>("dark");
+  const [activeLayer, setActiveLayer] = useState<TileLayerKey>(() => {
+    if (typeof document !== "undefined") {
+      return document.documentElement.getAttribute("data-theme") === "light" ? "street" : "dark";
+    }
+    return "dark";
+  });
   const [showLayerMenu, setShowLayerMenu] = useState(false);
   const [copied, setCopied] = useState(false);
   const [activeView, setActiveView] = useState<ActiveView>("map");
@@ -212,7 +228,12 @@ export default function MapView({ result }: MapViewProps) {
             zoomControl={false}
             attributionControl={false}
           >
-            <TileLayer url={TILE_LAYERS.dark.url} subdomains="abcd" />
+            <TileLayer
+              url={TILE_LAYERS[activeLayer].url}
+              subdomains={TILE_LAYERS[activeLayer].subdomains || "abc"}
+              maxNativeZoom={19}
+              maxZoom={20}
+            />
           </MapContainer>
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="bg-zinc-950/80 backdrop-blur-md border border-zinc-800 rounded-2xl px-6 py-4 text-center shadow-2xl">
@@ -299,6 +320,7 @@ export default function MapView({ result }: MapViewProps) {
               url={layer.url}
               attribution={layer.attribution}
               subdomains={layer.subdomains || "abc"}
+              maxNativeZoom={layer.maxNativeZoom}
               maxZoom={20}
             />
             <ScaleControl position="bottomleft" />
