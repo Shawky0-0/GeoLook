@@ -29,13 +29,13 @@ function closestImage(images: MapillaryImage[], lat: number, lng: number): strin
 async function findNearestImageId(lat: number, lng: number, token: string): Promise<string | null> {
   const base = "https://graph.mapillary.com/images";
 
-  // First pass: panoramic only — start tiny (≈100m), expand to 5km, fetch 100 candidates each time
+  // First pass: panoramic only — start tiny (≈100m), expand to 5km
   for (const d of [0.001, 0.003, 0.008, 0.02, 0.05]) {
     const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
     try {
       const res = await fetch(
-        `${base}?fields=id,geometry&bbox=${bbox}&limit=100&is_pano=true&access_token=${token}`,
-        { signal: AbortSignal.timeout(8000) }
+        `${base}?fields=id,geometry&bbox=${bbox}&limit=25&is_pano=true&access_token=${token}`,
+        { signal: AbortSignal.timeout(5000) }
       );
       const data = await res.json();
       const id = closestImage(data?.data ?? [], lat, lng);
@@ -48,8 +48,8 @@ async function findNearestImageId(lat: number, lng: number, token: string): Prom
     const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
     try {
       const res = await fetch(
-        `${base}?fields=id,geometry&bbox=${bbox}&limit=100&access_token=${token}`,
-        { signal: AbortSignal.timeout(8000) }
+        `${base}?fields=id,geometry&bbox=${bbox}&limit=25&access_token=${token}`,
+        { signal: AbortSignal.timeout(5000) }
       );
       const data = await res.json();
       const id = closestImage(data?.data ?? [], lat, lng);
@@ -103,7 +103,11 @@ export default function MapillaryPanel({ lat, lng, locationLabel }: MapillaryPan
           });
         });
 
-        viewer.on("image", () => { if (!cancelled) setStatus("loaded"); });
+        // viewer.image() resolves when the initial image is ready (unlike the
+        // "image" event which only fires on subsequent navigation changes)
+        const markLoaded = () => { if (!cancelled) setStatus("loaded"); };
+        viewer.image().then(markLoaded).catch(() => {});
+        viewer.on("image", markLoaded); // also fires on forward/back navigation
 
       } catch {
         if (!cancelled) setStatus("error");
