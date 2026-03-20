@@ -175,27 +175,33 @@ export default function TerminalDemo() {
       </div>
 
       {/* Body */}
-      <div className="px-5 py-4 font-mono text-[11px] min-h-[230px] flex flex-col">
+      <div className="px-4 sm:px-5 py-4 font-mono text-[10px] sm:text-[11px] min-h-[200px] sm:min-h-[230px] flex flex-col">
 
         {/* Prompt */}
-        <div className="flex items-center gap-2 mb-4" style={{ color: "rgba(74,222,128,0.35)" }}>
-          <span>$</span>
-          <span>geolook analyze ./input.jpg --deep --geo</span>
-          <span className="inline-block w-[7px] h-[13px] animate-pulse" style={{ background: "rgba(74,222,128,0.5)" }} />
+        <div className="flex items-center gap-2 mb-4 flex-wrap" style={{ color: "rgba(74,222,128,0.35)" }}>
+          <span className="shrink-0">$</span>
+          <span className="break-all">geolook analyze --deep --geo</span>
+          <span className="inline-block w-[7px] h-[13px] animate-pulse shrink-0" style={{ background: "rgba(74,222,128,0.5)" }} />
         </div>
 
-        {/* Lines */}
-        <div className="space-y-2.5 flex-1">
+        {/* Lines — 2-row on mobile, 1-row on sm+ */}
+        <div className="space-y-3 flex-1">
           {session.lines.slice(0, lineCount).map((line, i) => (
             <div
               key={`${idx}-${i}`}
-              className="flex items-center gap-1.5"
+              className="space-y-1"
               style={{ animation: "tFadeIn 0.28s ease-out both" }}
             >
-              <span style={{ color: "rgba(74,222,128,0.4)" }}>►</span>
-              <span style={{ color: "rgba(74,222,128,0.65)", whiteSpace: "nowrap" }}>{line.cmd}</span>
-              <Bar key={`${idx}-${i}-b`} />
-              <span style={{ color: "#bbf7d0", whiteSpace: "nowrap" }}>{line.result}</span>
+              {/* Row 1: arrow + command */}
+              <div className="flex items-center gap-1.5">
+                <span style={{ color: "rgba(74,222,128,0.4)" }}>►</span>
+                <span style={{ color: "rgba(74,222,128,0.65)" }}>{line.cmd}</span>
+              </div>
+              {/* Row 2: bar + result */}
+              <div className="flex items-center gap-2 pl-3">
+                <Bar key={`${idx}-${i}-b`} />
+                <span style={{ color: "#bbf7d0" }}>{line.result}</span>
+              </div>
             </div>
           ))}
         </div>
@@ -203,29 +209,29 @@ export default function TerminalDemo() {
         {/* Match */}
         {showMatch && (
           <div
-            className="mt-4 rounded-xl px-4 py-3 flex items-center justify-between"
+            className="mt-4 rounded-xl px-3 sm:px-4 py-3 flex items-center justify-between gap-2"
             style={{
               background: `${session.color}0d`,
               border: `1px solid ${session.color}28`,
               animation: "tFadeIn 0.4s ease-out both",
             }}
           >
-            <div>
+            <div className="min-w-0">
               <p className="text-[9px] uppercase tracking-[0.15em] mb-1" style={{ color: "rgba(74,222,128,0.4)" }}>
                 location identified
               </p>
               <div className="flex items-center gap-2">
-                <span className="text-base leading-none">{session.flag}</span>
-                <span className="text-sm font-bold" style={{ color: session.color }}>
+                <span className="text-base leading-none shrink-0">{session.flag}</span>
+                <span className="text-xs sm:text-sm font-bold truncate" style={{ color: session.color }}>
                   {session.location}
                 </span>
               </div>
             </div>
-            <div className="text-right">
+            <div className="text-right shrink-0">
               <p className="text-[9px] uppercase tracking-[0.15em] mb-0.5" style={{ color: "rgba(74,222,128,0.4)" }}>
                 confidence
               </p>
-              <span className="text-2xl font-black" style={{ color: session.color }}>
+              <span className="text-xl sm:text-2xl font-black" style={{ color: session.color }}>
                 {session.confidence}%
               </span>
             </div>
