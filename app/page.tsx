@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import ImageUploader from "@/components/ImageUploader";
 import ResultsPanel from "@/components/ResultsPanel";
 import PlaceInfo from "@/components/PlaceInfo";
+import NearbyPlaces from "@/components/NearbyPlaces";
 import ExamplePlaces from "@/components/ExamplePlaces";
 import TerminalDemo from "@/components/TerminalDemo";
 import { GeoResult, AnalysisState } from "@/types";
@@ -44,6 +45,7 @@ export default function HomePage() {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedAltIndex, setSelectedAltIndex] = useState<number | undefined>(undefined);
   const [wikiInfo, setWikiInfo] = useState<WikiInfo | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   // Fetch Wikipedia info whenever a result arrives
   useEffect(() => {
@@ -64,6 +66,10 @@ export default function HomePage() {
     setErrorSuggestion(null);
     setResult(null);
     setMapCenter(null);
+    // Capture photo as data URL for card generation
+    const reader = new FileReader();
+    reader.onload = (e) => setPhotoUrl(e.target?.result as string ?? null);
+    reader.readAsDataURL(file);
     setSelectedAltIndex(undefined);
 
     let msgIndex = 0;
@@ -135,6 +141,7 @@ export default function HomePage() {
     setMapCenter(null);
     setSelectedAltIndex(undefined);
     setWikiInfo(null);
+    setPhotoUrl(null);
   }, []);
 
   const handleSelectAlternative = useCallback((lat: number, lng: number, index: number) => {
@@ -350,6 +357,7 @@ export default function HomePage() {
               state={analysisState}
               onSelectAlternative={handleSelectAlternative}
               selectedAltIndex={selectedAltIndex}
+              photoUrl={photoUrl ?? undefined}
             />
           </div>
         ) : null}
@@ -361,6 +369,17 @@ export default function HomePage() {
               info={wikiInfo}
               coordinates={result.location.coordinates}
               country={result.location.country}
+            />
+          </div>
+        )}
+
+        {/* ════════════════ NEARBY PLACES ════════════════ */}
+        {analysisState === "done" && result && (
+          <div className="mt-4">
+            <NearbyPlaces
+              lat={result.location.coordinates.lat}
+              lng={result.location.coordinates.lng}
+              primaryTitle={result.location.landmark}
             />
           </div>
         )}

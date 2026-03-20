@@ -10,9 +10,12 @@ import {
   Navigation,
   Info,
   Layers,
+  Download,
+  Loader2,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { GeoResult, AnalysisState } from "@/types";
+import { downloadResultCard } from "@/lib/generateCard";
 import ConfidenceBar from "./ConfidenceBar";
 import ConfidenceRing from "./ConfidenceRing";
 
@@ -21,6 +24,7 @@ interface ResultsPanelProps {
   state: AnalysisState;
   onSelectAlternative?: (lat: number, lng: number, index: number) => void;
   selectedAltIndex?: number;
+  photoUrl?: string;
 }
 
 function getCountryFlag(country: string): string {
@@ -79,7 +83,7 @@ function getCountryFlag(country: string): string {
     "saudi arabia": "🇸🇦",
     "united arab emirates": "🇦🇪",
     uae: "🇦🇪",
-    israel: "🇮🇱",
+    palestine: "🇵🇸",
     iran: "🇮🇷",
     pakistan: "🇵🇰",
     bangladesh: "🇧🇩",
@@ -139,8 +143,10 @@ export default function ResultsPanel({
   state,
   onSelectAlternative,
   selectedAltIndex,
+  photoUrl,
 }: ResultsPanelProps) {
   const [showReasoning, setShowReasoning] = useState(false);
+  const [savingCard, setSavingCard] = useState(false);
 
   if (state === "idle" || (!result && state !== "analyzing")) {
     return null;
@@ -191,9 +197,27 @@ export default function ResultsPanel({
             <MapPin className="w-3.5 h-3.5 text-blue-400" />
           </div>
           <h2 className="text-sm font-semibold text-zinc-100">Detected Location</h2>
-          <div className="ml-auto flex items-center gap-1.5 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-[10px] font-semibold text-green-400">LIVE</span>
+          <div className="ml-auto flex items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              <span className="text-[10px] font-semibold text-green-400">LIVE</span>
+            </div>
+            <button
+              onClick={async () => {
+                if (!result || savingCard) return;
+                setSavingCard(true);
+                try { await downloadResultCard(result, photoUrl); }
+                finally { setSavingCard(false); }
+              }}
+              disabled={savingCard}
+              className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white bg-zinc-800/60 hover:bg-zinc-700/80 border border-zinc-700 hover:border-zinc-500 px-2.5 py-1 rounded-lg transition-all disabled:opacity-50"
+              title="Save result as image"
+            >
+              {savingCard
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <Download className="w-3 h-3" />}
+              Save Card
+            </button>
           </div>
         </div>
 
@@ -442,6 +466,7 @@ export default function ResultsPanel({
           </p>
         </div>
       )}
+
     </div>
   );
 }
