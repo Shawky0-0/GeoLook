@@ -30,27 +30,44 @@ function distMeters(lat1: number, lng1: number, lat2: number, lng2: number): num
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-/** Panoramic-only search: 2 requests max, picks closest. */
-async function findNearestPano(lat: number, lng: number, token: string): Promise<ImageResult | null> {
-  for (const d of [0.01, 0.05]) {
-    const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
-    try {
-      const res = await fetch(
-        `https://graph.mapillary.com/images?fields=id,geometry&bbox=${bbox}&limit=25&is_pano=true&access_token=${token}`,
-        { signal: AbortSignal.timeout(5000) }
-      );
-      const images: MapillaryImage[] = (await res.json())?.data ?? [];
-      let bestId = "", bestLat = 0, bestLng = 0, bestDist = Infinity;
-      for (const img of images) {
-        if (!img.geometry) continue;
-        const [iLng, iLat] = img.geometry.coordinates;
-        const dist = (iLat - lat) ** 2 + (iLng - lng) ** 2;
-        if (dist < bestDist) { bestDist = dist; bestId = img.id; bestLat = iLat; bestLng = iLng; }
-      }
-      if (bestId) return { id: bestId, iLat: bestLat, iLng: bestLng };
-    } catch { /* try wider bbox */ }
-  }
+/** Single bbox request — returns closest image found or null. */
+async function fetchBest(
+  lat: number, lng: number, token: string, d: number, isPano: boolean
+): Promise<ImageResult | null> {
+  const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
+  const extra = isPano ? "&is_pano=true" : "";
+  try {
+    const res = await fetch(
+      `https://graph.mapillary.com/images?fields=id,geometry&bbox=${bbox}&limit=25${extra}&access_token=${token}`,
+      { signal: AbortSignal.timeout(6000) }
+    );
+    const images: MapillaryImage[] = (await res.json())?.data ?? [];
+    let bestId = "", bestLat = 0, bestLng = 0, bestDist = Infinity;
+    for (const img of images) {
+      if (!img.geometry) continue;
+      const [iLng, iLat] = img.geometry.coordinates;
+      const dist = (iLat - lat) ** 2 + (iLng - lng) ** 2;
+      if (dist < bestDist) { bestDist = dist; bestId = img.id; bestLat = iLat; bestLng = iLng; }
+    }
+    if (bestId) return { id: bestId, iLat: bestLat, iLng: bestLng };
+  } catch { /* swallow */ }
   return null;
+}
+
+/** Fire all radii in parallel — fastest result from the smallest radius wins. */
+async function findNearestPano(lat: number, lng: number, token: string): Promise<ImageResult | null> {
+  // All 4 pano requests fire simultaneously (≈1km → 5km → 15km → 22km)
+  const panoResults = await Promise.all(
+    [0.008, 0.05, 0.13, 0.2].map(d => fetchBest(lat, lng, token, d, true))
+  );
+  const pano = panoResults.find(r => r != null);
+  if (pano) return pano;
+
+  // Non-pano fallback — also parallel
+  const anyResults = await Promise.all(
+    [0.005, 0.05].map(d => fetchBest(lat, lng, token, d, false))
+  );
+  return anyResults.find(r => r != null) ?? null;
 }
 
 export default function MapillaryPanel({ lat, lng, locationLabel }: MapillaryPanelProps) {
