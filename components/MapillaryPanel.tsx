@@ -79,8 +79,6 @@ export default function MapillaryPanel({ lat, lng, locationLabel }: MapillaryPan
         if (!imgResult) { setStatus("no-coverage"); return; }
 
         const { id: imageId, iLat, iLng } = imgResult;
-        const bearing = bearingTo(iLat, iLng, lat, lng);
-        const dist = distMeters(iLat, iLng, lat, lng);
 
         const { Viewer } = await import("mapillary-js");
         if (cancelled || !containerRef.current) return;
@@ -99,17 +97,30 @@ export default function MapillaryPanel({ lat, lng, locationLabel }: MapillaryPan
           });
         });
 
-        const markLoaded = () => {
+        // Helper: recalculate arrow from a given image position
+        const updateArrow = (imgLat: number, imgLng: number) => {
+          const newDist = distMeters(imgLat, imgLng, lat, lng);
+          setDistM(newDist);
+          setTargetBearing(newDist > 20 ? bearingTo(imgLat, imgLng, lat, lng) : null);
+        };
+
+        // Initial load — use position from search result
+        viewer.on("load", () => {
+          if (!cancelled) { setStatus("loaded"); updateArrow(iLat, iLng); }
+        });
+
+        // Every navigation step — pull position from the event's image object
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        viewer.on("image", (e: any) => {
           if (!cancelled) {
             setStatus("loaded");
-            // Show arrow only when image spawned more than 20 m from target
-            if (dist > 20) { setTargetBearing(bearing); setDistM(dist); }
+            const imgLat = e.image?.lngLat?.lat;
+            const imgLng = e.image?.lngLat?.lng;
+            if (imgLat != null && imgLng != null) updateArrow(imgLat, imgLng);
           }
-        };
-        viewer.on("load", markLoaded);
-        viewer.on("image", markLoaded);
+        });
 
-        // Keep arrow synced with current viewing direction
+        // Keep arrow direction synced with viewing direction
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         viewer.on("bearing", (e: any) => { if (!cancelled) setViewBearing(e.bearing ?? 0); });
 
