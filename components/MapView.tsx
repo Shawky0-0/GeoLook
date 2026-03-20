@@ -11,7 +11,23 @@ import type { MapRef } from "react-map-gl/maplibre";
 import type { StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import StreetViewPanel from "./StreetViewPanel";
-import { GeoResult } from "@/types";
+import { GeoResult, AnalysisState } from "@/types";
+
+// Famous world locations to fly through during AI scan
+const SCAN_LOCATIONS = [
+  { lng: 2.347,   lat: 48.858,  zoom: 11, label: "Europe"       },  // Paris
+  { lng: 139.692, lat: 35.689,  zoom: 11, label: "East Asia"    },  // Tokyo
+  { lng: -73.985, lat: 40.748,  zoom: 11, label: "Americas"     },  // New York
+  { lng: 31.235,  lat: 30.045,  zoom: 11, label: "Africa"       },  // Cairo
+  { lng: 77.209,  lat: 28.614,  zoom: 11, label: "South Asia"   },  // Delhi
+  { lng: -43.172, lat: -22.906, zoom: 10, label: "S. America"   },  // Rio
+  { lng: 151.209, lat: -33.868, zoom: 11, label: "Oceania"      },  // Sydney
+  { lng: -0.127,  lat: 51.507,  zoom: 11, label: "UK"           },  // London
+  { lng: 37.617,  lat: 55.755,  zoom: 11, label: "E. Europe"    },  // Moscow
+  { lng: 55.296,  lat: 25.197,  zoom: 11, label: "Middle East"  },  // Dubai
+  { lng: 12.492,  lat: 41.890,  zoom: 11, label: "Mediterranean"},  // Rome
+  { lng: -58.381, lat: -34.603, zoom: 10, label: "S. Atlantic"  },  // Buenos Aires
+];
 
 const EMBEDDED_STREET_VIEW_ENABLED = true;
 
@@ -90,10 +106,13 @@ type ActiveView = "map" | "streetview";
 
 interface MapViewProps {
   result: GeoResult | null;
+  state: AnalysisState;
 }
 
-export default function MapView({ result }: MapViewProps) {
+export default function MapView({ result, state }: MapViewProps) {
   const mapRef = useRef<MapRef>(null);
+  const scanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const scanIndexRef = useRef(0);
 
   const [activeLayer, setActiveLayer] = useState<TileLayerKey>(() => {
     if (typeof document !== "undefined") {
@@ -108,9 +127,49 @@ export default function MapView({ result }: MapViewProps) {
   const [copied, setCopied] = useState(false);
   const [activeView, setActiveView] = useState<ActiveView>("map");
   const [popupInfo, setPopupInfo] = useState<PopupState | null>(null);
+  const [scanLabel, setScanLabel] = useState("");
+  const [scanCoords, setScanCoords] = useState({ lat: 0, lng: 0 });
 
   const canUseEmbeddedStreetView =
     EMBEDDED_STREET_VIEW_ENABLED && Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY);
+
+  // ── Globe-scanning animation during analysis ──
+  useEffect(() => {
+    if (state !== "analyzing") {
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
+        scanIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Shuffle scan order
+    const shuffled = [...SCAN_LOCATIONS].sort(() => Math.random() - 0.5);
+    scanIndexRef.current = 0;
+
+    const flyNext = () => {
+      const loc = shuffled[scanIndexRef.current % shuffled.length];
+      scanIndexRef.current++;
+      setScanLabel(loc.label);
+      setScanCoords({ lat: loc.lat, lng: loc.lng });
+      mapRef.current?.flyTo({
+        center: [loc.lng, loc.lat],
+        zoom: loc.zoom,
+        duration: 1800,
+        essential: true,
+      });
+    };
+
+    // Fly to world view first, then start scanning
+    mapRef.current?.flyTo({ center: [0, 20], zoom: 2, duration: 600, essential: true });
+    const kickoff = setTimeout(flyNext, 700);
+    scanIntervalRef.current = setInterval(flyNext, 2600);
+
+    return () => {
+      clearTimeout(kickoff);
+      if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
+    };
+  }, [state]);
 
   // Fly to new location when result changes
   useEffect(() => {
@@ -319,12 +378,64 @@ export default function MapView({ result }: MapViewProps) {
           </Map>
 
           {/* No result overlay */}
-          {!result && (
+          {!result && state === "idle" && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="bg-zinc-950/80 backdrop-blur-md border border-zinc-800 rounded-2xl px-6 py-4 text-center shadow-2xl">
                 <div className="text-3xl mb-2">🌍</div>
                 <p className="text-sm font-medium text-zinc-300">Upload an image to detect location</p>
                 <p className="text-xs text-zinc-600 mt-1">The pin will appear here</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── AI Scanning overlay ── */}
+          {state === "analyzing" && (
+            <div className="absolute inset-0 z-[500] pointer-events-none">
+              {/* Subtle blue grid */}
+              <div style={{
+                position: "absolute", inset: 0,
+                backgroundImage: "linear-gradient(rgba(59,130,246,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.06) 1px, transparent 1px)",
+                backgroundSize: "48px 48px",
+              }} />
+
+              {/* Corner scan brackets */}
+              {[
+                { top: 12, left: 12, borderTop: "2px solid rgba(59,130,246,0.8)", borderLeft: "2px solid rgba(59,130,246,0.8)" },
+                { top: 12, right: 12, borderTop: "2px solid rgba(59,130,246,0.8)", borderRight: "2px solid rgba(59,130,246,0.8)" },
+                { bottom: 12, left: 12, borderBottom: "2px solid rgba(59,130,246,0.8)", borderLeft: "2px solid rgba(59,130,246,0.8)" },
+                { bottom: 12, right: 12, borderBottom: "2px solid rgba(59,130,246,0.8)", borderRight: "2px solid rgba(59,130,246,0.8)" },
+              ].map((s, i) => (
+                <div key={i} style={{ position: "absolute", width: 24, height: 24, ...s }} />
+              ))}
+
+              {/* Crosshair in visual center */}
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ position: "relative", width: 72, height: 72 }}>
+                  {/* pulsing rings */}
+                  <div style={{ position: "absolute", inset: 0, border: "1.5px solid rgba(59,130,246,0.7)", borderRadius: "50%", animation: "scan-ring 1.6s ease-out infinite" }} />
+                  <div style={{ position: "absolute", inset: 0, border: "1.5px solid rgba(59,130,246,0.4)", borderRadius: "50%", animation: "scan-ring 1.6s ease-out infinite 0.55s" }} />
+                  <div style={{ position: "absolute", inset: 0, border: "1.5px solid rgba(59,130,246,0.2)", borderRadius: "50%", animation: "scan-ring 1.6s ease-out infinite 1.1s" }} />
+                  {/* crosshair lines */}
+                  <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 1, background: "rgba(59,130,246,0.7)", transform: "translateY(-50%)" }} />
+                  <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "rgba(59,130,246,0.7)", transform: "translateX(-50%)" }} />
+                  {/* center dot */}
+                  <div style={{ position: "absolute", inset: "50%", width: 6, height: 6, margin: "-3px", borderRadius: "50%", background: "#3b82f6", boxShadow: "0 0 10px rgba(59,130,246,0.9)" }} />
+                </div>
+              </div>
+
+              {/* Top status badge */}
+              <div style={{ position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 6, background: "rgba(9,9,11,0.88)", border: "1px solid rgba(59,130,246,0.35)", borderRadius: 20, padding: "5px 14px", backdropFilter: "blur(8px)" }}>
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#3b82f6", boxShadow: "0 0 8px #3b82f6", animation: "blink 1s ease-in-out infinite" }} />
+                <span style={{ fontSize: 10, color: "#93c5fd", fontWeight: 700, letterSpacing: "0.12em" }}>AI SCANNING · {scanLabel || "GLOBE"}</span>
+              </div>
+
+              {/* Bottom coordinate readout */}
+              <div style={{ position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)", background: "rgba(9,9,11,0.88)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 10, padding: "5px 12px", backdropFilter: "blur(8px)", textAlign: "center" }}>
+                <p style={{ fontSize: 9, color: "#3b82f6", fontWeight: 700, letterSpacing: "0.1em", marginBottom: 2 }}>CANDIDATE COORDINATES</p>
+                <p style={{ fontSize: 11, color: "#93c5fd", fontFamily: "monospace", fontWeight: 600 }}>
+                  {Math.abs(scanCoords.lat).toFixed(4)}° {scanCoords.lat >= 0 ? "N" : "S"} &nbsp;
+                  {Math.abs(scanCoords.lng).toFixed(4)}° {scanCoords.lng >= 0 ? "E" : "W"}
+                </p>
               </div>
             </div>
           )}
@@ -426,6 +537,14 @@ export default function MapView({ result }: MapViewProps) {
             @keyframes georipple {
               0%  { transform: scale(.7); opacity: .9; }
               100%{ transform: scale(2.4); opacity: 0; }
+            }
+            @keyframes scan-ring {
+              0%   { transform: scale(0.6); opacity: 0.9; }
+              100% { transform: scale(2.2); opacity: 0; }
+            }
+            @keyframes blink {
+              0%, 100% { opacity: 1; }
+              50%       { opacity: 0.3; }
             }
             .maplibregl-popup-content {
               background: #18181b !important;

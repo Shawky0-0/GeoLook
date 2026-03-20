@@ -298,7 +298,7 @@ export default function HomePage() {
           {/* ── Right column: Map (2/3 width) ── */}
           {analysisState !== "idle" && (
             <div className="lg:col-span-2">
-              <MapView result={mapResult} />
+              <MapView result={mapResult} state={analysisState} />
             </div>
           )}
         </div>
