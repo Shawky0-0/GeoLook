@@ -57,6 +57,7 @@ export default function HomePage() {
   }, [result, analysisState]);
 
   const handleAnalyze = useCallback(async (file: File) => {
+    window.scrollTo({ top: 0, behavior: "instant" });
     setAnalysisState("analyzing");
     setError(null);
     setErrorSuggestion(null);

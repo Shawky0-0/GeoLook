@@ -103,11 +103,9 @@ export default function MapillaryPanel({ lat, lng, locationLabel }: MapillaryPan
           });
         });
 
-        // viewer.image() resolves when the initial image is ready (unlike the
-        // "image" event which only fires on subsequent navigation changes)
         const markLoaded = () => { if (!cancelled) setStatus("loaded"); };
-        viewer.image().then(markLoaded).catch(() => {});
-        viewer.on("image", markLoaded); // also fires on forward/back navigation
+        viewer.on("load", markLoaded);   // fires once when viewer fully initialises
+        viewer.on("image", markLoaded);  // fires on forward/back navigation
 
       } catch {
         if (!cancelled) setStatus("error");
