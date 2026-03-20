@@ -8,6 +8,7 @@ import ImageUploader from "@/components/ImageUploader";
 import ResultsPanel from "@/components/ResultsPanel";
 import PlaceInfo from "@/components/PlaceInfo";
 import ExamplePlaces from "@/components/ExamplePlaces";
+import TerminalDemo from "@/components/TerminalDemo";
 import { GeoResult, AnalysisState } from "@/types";
 import { getPlaceInfo, WikiInfo } from "@/lib/wikipedia";
 import { compressImageForUpload } from "@/lib/compress";
@@ -327,8 +328,16 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ════════════════ FEATURE CARDS (idle only) ════════════════ */}
+        {/* ════════════════ TERMINAL DEMO (idle only) ════════════════ */}
         {analysisState === "idle" && (
+          <div className="mt-10 animate-fade-up">
+            <p className="text-center text-xs text-zinc-600 mb-3 uppercase tracking-widest">What the AI sees</p>
+            <TerminalDemo />
+          </div>
+        )}
+
+        {/* ════════════════ OLD FEATURE CARDS — removed ════════════════ */}
+        {false && (
           <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto animate-fade-up">
             {[
               {
