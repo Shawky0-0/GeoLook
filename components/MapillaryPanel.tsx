@@ -12,52 +12,57 @@ interface MapillaryPanelProps {
 type Status = "loading" | "loaded" | "no-coverage" | "error";
 
 type MapillaryImage = { id: string; geometry?: { coordinates: [number, number] } };
+type SearchResult = { id: string; dist: number };
 
-function closestImage(images: MapillaryImage[], lat: number, lng: number): string | null {
-  if (!images.length) return null;
-  let best = images[0];
-  let bestDist = Infinity;
-  for (const img of images) {
-    if (!img.geometry) continue;
-    const [iLng, iLat] = img.geometry.coordinates;
-    const d = (iLat - lat) ** 2 + (iLng - lng) ** 2;
-    if (d < bestDist) { bestDist = d; best = img; }
+/** Fetch up to 25 images in an expanding bbox and return the closest one with its distance. */
+async function fetchBest(
+  lat: number, lng: number, token: string,
+  deltas: number[], isPano: boolean
+): Promise<SearchResult | null> {
+  for (const d of deltas) {
+    const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
+    const extra = isPano ? "&is_pano=true" : "";
+    try {
+      const res = await fetch(
+        `https://graph.mapillary.com/images?fields=id,geometry&bbox=${bbox}&limit=25${extra}&access_token=${token}`,
+        { signal: AbortSignal.timeout(5000) }
+      );
+      const images: MapillaryImage[] = (await res.json())?.data ?? [];
+      if (!images.length) continue;
+      let best = images[0], bestDist = Infinity;
+      for (const img of images) {
+        if (!img.geometry) continue;
+        const [iLng, iLat] = img.geometry.coordinates;
+        const dist = (iLat - lat) ** 2 + (iLng - lng) ** 2;
+        if (dist < bestDist) { bestDist = dist; best = img; }
+      }
+      return { id: best.id, dist: bestDist === Infinity ? 0 : bestDist };
+    } catch { /* try next delta */ }
   }
-  return best.id;
+  return null;
 }
 
 async function findNearestImageId(lat: number, lng: number, token: string): Promise<string | null> {
-  const base = "https://graph.mapillary.com/images";
+  // Run both searches in parallel:
+  // • pano search: expanding up to 5 km
+  // • close-any search: only very near the target (≤ 0.004° ≈ 450 m)
+  const [pano, close] = await Promise.all([
+    fetchBest(lat, lng, token, [0.001, 0.003, 0.008, 0.02, 0.05], true),
+    fetchBest(lat, lng, token, [0.001, 0.002, 0.004], false),
+  ]);
 
-  // First pass: panoramic only — start tiny (≈100m), expand to 5km
-  for (const d of [0.001, 0.003, 0.008, 0.02, 0.05]) {
-    const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
-    try {
-      const res = await fetch(
-        `${base}?fields=id,geometry&bbox=${bbox}&limit=25&is_pano=true&access_token=${token}`,
-        { signal: AbortSignal.timeout(5000) }
-      );
-      const data = await res.json();
-      const id = closestImage(data?.data ?? [], lat, lng);
-      if (id) return id;
-    } catch { /* try next delta */ }
+  if (pano && close) {
+    // Prefer panoramic unless a regular photo is 5× closer in actual distance
+    // (dist is squared, so 5× real distance → 25× dist²)
+    return Math.sqrt(close.dist) * 5 < Math.sqrt(pano.dist) ? close.id : pano.id;
   }
 
-  // Second pass: any image fallback
-  for (const d of [0.003, 0.01, 0.05]) {
-    const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
-    try {
-      const res = await fetch(
-        `${base}?fields=id,geometry&bbox=${bbox}&limit=25&access_token=${token}`,
-        { signal: AbortSignal.timeout(5000) }
-      );
-      const data = await res.json();
-      const id = closestImage(data?.data ?? [], lat, lng);
-      if (id) return id;
-    } catch { /* try next delta */ }
-  }
+  if (pano) return pano.id;
+  if (close) return close.id;
 
-  return null;
+  // Last resort: any image at larger radius
+  const fallback = await fetchBest(lat, lng, token, [0.01, 0.05], false);
+  return fallback?.id ?? null;
 }
 
 export default function MapillaryPanel({ lat, lng, locationLabel }: MapillaryPanelProps) {
