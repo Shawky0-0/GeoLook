@@ -27,13 +27,15 @@ function closestImage(images: MapillaryImage[], lat: number, lng: number): strin
 }
 
 async function findNearestImageId(lat: number, lng: number, token: string): Promise<string | null> {
-  // First pass: 360° panoramic images only — fetch 10, pick closest
-  for (const d of [0.003, 0.008, 0.02, 0.05]) {
+  const base = "https://graph.mapillary.com/images";
+
+  // First pass: panoramic only — start tiny (≈100m), expand to 5km, fetch 100 candidates each time
+  for (const d of [0.001, 0.003, 0.008, 0.02, 0.05]) {
     const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
     try {
       const res = await fetch(
-        `https://graph.mapillary.com/images?fields=id,geometry&bbox=${bbox}&limit=10&is_pano=true&access_token=${token}`,
-        { signal: AbortSignal.timeout(6000) }
+        `${base}?fields=id,geometry&bbox=${bbox}&limit=100&is_pano=true&access_token=${token}`,
+        { signal: AbortSignal.timeout(8000) }
       );
       const data = await res.json();
       const id = closestImage(data?.data ?? [], lat, lng);
@@ -41,13 +43,13 @@ async function findNearestImageId(lat: number, lng: number, token: string): Prom
     } catch { /* try next delta */ }
   }
 
-  // Second pass: any image as fallback
-  for (const d of [0.05, 0.1, 0.2]) {
+  // Second pass: any image fallback
+  for (const d of [0.003, 0.01, 0.05]) {
     const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
     try {
       const res = await fetch(
-        `https://graph.mapillary.com/images?fields=id,geometry&bbox=${bbox}&limit=10&access_token=${token}`,
-        { signal: AbortSignal.timeout(6000) }
+        `${base}?fields=id,geometry&bbox=${bbox}&limit=100&access_token=${token}`,
+        { signal: AbortSignal.timeout(8000) }
       );
       const data = await res.json();
       const id = closestImage(data?.data ?? [], lat, lng);
