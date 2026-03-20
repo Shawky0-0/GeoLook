@@ -12,10 +12,8 @@ interface MapillaryPanelProps {
 type Status = "loading" | "loaded" | "no-coverage" | "error";
 
 type MapillaryImage = { id: string; geometry?: { coordinates: [number, number] } };
-type SearchResult = { id: string; dist: number; iLat: number; iLng: number };
-type ImageResult  = { id: string; iLat: number; iLng: number };
+type ImageResult   = { id: string; iLat: number; iLng: number };
 
-/** Compass bearing (0–360°, 0=North) from one point to another. */
 function bearingTo(fromLat: number, fromLng: number, toLat: number, toLng: number): number {
   const φ1 = fromLat * Math.PI / 180, φ2 = toLat * Math.PI / 180;
   const Δλ = (toLng - fromLng) * Math.PI / 180;
@@ -24,7 +22,6 @@ function bearingTo(fromLat: number, fromLng: number, toLat: number, toLng: numbe
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
-/** Haversine distance in metres between two lat/lng points. */
 function distMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
   const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
@@ -33,49 +30,27 @@ function distMeters(lat1: number, lng1: number, lat2: number, lng2: number): num
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-async function fetchBest(
-  lat: number, lng: number, token: string,
-  deltas: number[], isPano: boolean
-): Promise<SearchResult | null> {
-  for (const d of deltas) {
+/** Panoramic-only search: 2 requests max, picks closest. */
+async function findNearestPano(lat: number, lng: number, token: string): Promise<ImageResult | null> {
+  for (const d of [0.01, 0.05]) {
     const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
-    const extra = isPano ? "&is_pano=true" : "";
     try {
       const res = await fetch(
-        `https://graph.mapillary.com/images?fields=id,geometry&bbox=${bbox}&limit=25${extra}&access_token=${token}`,
+        `https://graph.mapillary.com/images?fields=id,geometry&bbox=${bbox}&limit=25&is_pano=true&access_token=${token}`,
         { signal: AbortSignal.timeout(5000) }
       );
       const images: MapillaryImage[] = (await res.json())?.data ?? [];
-      if (!images.length) continue;
-      let best = images[0], bestDist = Infinity, bestLat = 0, bestLng = 0;
+      let bestId = "", bestLat = 0, bestLng = 0, bestDist = Infinity;
       for (const img of images) {
         if (!img.geometry) continue;
         const [iLng, iLat] = img.geometry.coordinates;
         const dist = (iLat - lat) ** 2 + (iLng - lng) ** 2;
-        if (dist < bestDist) { bestDist = dist; best = img; bestLat = iLat; bestLng = iLng; }
+        if (dist < bestDist) { bestDist = dist; bestId = img.id; bestLat = iLat; bestLng = iLng; }
       }
-      return { id: best.id, dist: bestDist === Infinity ? 0 : bestDist, iLat: bestLat, iLng: bestLng };
-    } catch { /* try next delta */ }
+      if (bestId) return { id: bestId, iLat: bestLat, iLng: bestLng };
+    } catch { /* try wider bbox */ }
   }
   return null;
-}
-
-async function findNearestImage(lat: number, lng: number, token: string): Promise<ImageResult | null> {
-  const [pano, close] = await Promise.all([
-    fetchBest(lat, lng, token, [0.001, 0.003, 0.008, 0.02, 0.05], true),
-    fetchBest(lat, lng, token, [0.001, 0.002, 0.004], false),
-  ]);
-
-  let chosen: SearchResult | null = null;
-  if (pano && close) {
-    chosen = Math.sqrt(close.dist) * 5 < Math.sqrt(pano.dist) ? close : pano;
-  } else {
-    chosen = pano ?? close;
-  }
-  if (chosen) return { id: chosen.id, iLat: chosen.iLat, iLng: chosen.iLng };
-
-  const fallback = await fetchBest(lat, lng, token, [0.01, 0.05], false);
-  return fallback ? { id: fallback.id, iLat: fallback.iLat, iLng: fallback.iLng } : null;
 }
 
 export default function MapillaryPanel({ lat, lng, locationLabel }: MapillaryPanelProps) {
@@ -99,7 +74,7 @@ export default function MapillaryPanel({ lat, lng, locationLabel }: MapillaryPan
 
     (async () => {
       try {
-        const imgResult = await findNearestImage(lat, lng, token);
+        const imgResult = await findNearestPano(lat, lng, token);
         if (cancelled) return;
         if (!imgResult) { setStatus("no-coverage"); return; }
 
