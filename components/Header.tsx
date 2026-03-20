@@ -65,11 +65,6 @@ export default function Header() {
               <span className="text-xs text-zinc-400 font-medium">AI Online</span>
             </div>
 
-            {/* Model badge */}
-            <div className="hidden lg:flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium px-3 py-1.5 rounded-full">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
-              Vision AI
-            </div>
 
             <ThemeToggle />
 

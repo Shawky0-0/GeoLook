@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   MapPin,
   Clock,
-  Cpu,
   ChevronDown,
   ChevronUp,
   Camera,
@@ -269,10 +268,6 @@ export default function ResultsPanel({
 
           {/* Model & timing */}
           <div className="flex flex-wrap gap-3 pt-3 border-t border-white/5">
-            <div className="flex items-center gap-2 text-xs bg-blue-500/5 border border-blue-500/10 px-2.5 py-1.5 rounded-lg">
-              <Cpu className="w-3 h-3 text-blue-400" />
-              <span className="text-zinc-500">Model: <span className="text-blue-300 font-medium">{analysis.model_used}</span></span>
-            </div>
             <div className="flex items-center gap-2 text-xs bg-cyan-500/5 border border-cyan-500/10 px-2.5 py-1.5 rounded-lg">
               <Clock className="w-3 h-3 text-cyan-400" />
               <span className="text-zinc-500">Time: <span className="text-cyan-300 font-medium">{formatProcessingTime(analysis.processing_time_ms)}</span></span>

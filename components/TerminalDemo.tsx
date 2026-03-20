@@ -105,7 +105,7 @@ function Bar() {
     return () => clearTimeout(t);
   }, []);
   return (
-    <div className="flex-1 mx-2 h-[2px] rounded-full overflow-hidden" style={{ background: "rgba(74,222,128,0.15)", minWidth: 40 }}>
+    <div className="w-full h-[2px] rounded-full overflow-hidden" style={{ background: "rgba(74,222,128,0.15)" }}>
       <div className="h-full rounded-full" style={{
         width: `${w}%`,
         background: "linear-gradient(90deg,#16a34a,#4ade80)",
@@ -175,7 +175,7 @@ export default function TerminalDemo() {
       </div>
 
       {/* Body */}
-      <div className="px-4 sm:px-5 py-4 font-mono text-[10px] sm:text-[11px] min-h-[200px] sm:min-h-[230px] flex flex-col">
+      <div className="px-4 sm:px-5 py-4 font-mono text-[10px] sm:text-[11px] min-h-[260px] sm:min-h-[280px] flex flex-col">
 
         {/* Prompt */}
         <div className="flex items-center gap-2 mb-4 flex-wrap" style={{ color: "rgba(74,222,128,0.35)" }}>
@@ -197,9 +197,12 @@ export default function TerminalDemo() {
                 <span style={{ color: "rgba(74,222,128,0.4)" }}>►</span>
                 <span style={{ color: "rgba(74,222,128,0.65)" }}>{line.cmd}</span>
               </div>
-              {/* Row 2: bar + result */}
-              <div className="flex items-center gap-2 pl-3">
+              {/* Row 2: full-width bar */}
+              <div className="pl-3 pr-1">
                 <Bar key={`${idx}-${i}-b`} />
+              </div>
+              {/* Row 3: result */}
+              <div className="pl-3">
                 <span style={{ color: "#bbf7d0" }}>{line.result}</span>
               </div>
             </div>

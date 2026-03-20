@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface Place {
   landmark: string;
@@ -11,6 +11,7 @@ interface Place {
   lat: string;
   lng: string;
   gradient: string;
+  lightGradient: string;
   accent: string;
   wikiTitle: string;
 }
@@ -25,6 +26,7 @@ const PLACES: Place[] = [
     lat: "48.8584° N",
     lng: "2.2945° E",
     gradient: "from-blue-950 to-indigo-950",
+    lightGradient: "from-blue-100 to-indigo-100",
     accent: "#60a5fa",
     wikiTitle: "Eiffel Tower",
   },
@@ -37,6 +39,7 @@ const PLACES: Place[] = [
     lat: "29.9792° N",
     lng: "31.1342° E",
     gradient: "from-amber-950 to-orange-950",
+    lightGradient: "from-amber-100 to-orange-100",
     accent: "#fbbf24",
     wikiTitle: "Great Pyramid of Giza",
   },
@@ -49,6 +52,7 @@ const PLACES: Place[] = [
     lat: "35.6595° N",
     lng: "139.7004° E",
     gradient: "from-rose-950 to-pink-950",
+    lightGradient: "from-rose-100 to-pink-100",
     accent: "#fb7185",
     wikiTitle: "Shibuya Crossing",
   },
@@ -61,6 +65,7 @@ const PLACES: Place[] = [
     lat: "41.8902° N",
     lng: "12.4922° E",
     gradient: "from-yellow-950 to-amber-950",
+    lightGradient: "from-yellow-100 to-amber-100",
     accent: "#facc15",
     wikiTitle: "Colosseum",
   },
@@ -73,6 +78,7 @@ const PLACES: Place[] = [
     lat: "25.1972° N",
     lng: "55.2744° E",
     gradient: "from-cyan-950 to-teal-950",
+    lightGradient: "from-cyan-100 to-teal-100",
     accent: "#22d3ee",
     wikiTitle: "Burj Khalifa",
   },
@@ -85,6 +91,7 @@ const PLACES: Place[] = [
     lat: "51.5007° N",
     lng: "0.1246° W",
     gradient: "from-violet-950 to-purple-950",
+    lightGradient: "from-violet-100 to-purple-100",
     accent: "#a78bfa",
     wikiTitle: "Elizabeth Tower",
   },
@@ -97,6 +104,7 @@ const PLACES: Place[] = [
     lat: "41.0054° N",
     lng: "28.9768° E",
     gradient: "from-emerald-950 to-green-950",
+    lightGradient: "from-emerald-100 to-green-100",
     accent: "#34d399",
     wikiTitle: "Sultan Ahmed Mosque",
   },
@@ -109,21 +117,33 @@ const PLACES: Place[] = [
     lat: "41.4036° N",
     lng: "2.1744° E",
     gradient: "from-orange-950 to-red-950",
+    lightGradient: "from-orange-100 to-red-100",
     accent: "#fb923c",
     wikiTitle: "Sagrada Família",
   },
 ];
 
+// Duplicate for seamless loop
 const ALL = [...PLACES, ...PLACES];
 
-function PlaceCard({
-  place,
-  photo,
-}: {
-  place: Place;
-  photo: string | undefined;
-}) {
+function useTheme() {
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  useEffect(() => {
+    const check = () => {
+      const t = document.documentElement.getAttribute("data-theme") ?? "dark";
+      setTheme(t as "dark" | "light");
+    };
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => obs.disconnect();
+  }, []);
+  return theme;
+}
+
+function PlaceCard({ place, photo }: { place: Place; photo: string | undefined }) {
   const [imgLoaded, setImgLoaded] = useState(false);
+  const theme = useTheme();
 
   useEffect(() => {
     if (!photo) return;
@@ -134,72 +154,57 @@ function PlaceCard({
     return () => { img.onload = null; };
   }, [photo]);
 
+  const grad = theme === "light" ? place.lightGradient : place.gradient;
+
   return (
     <div
-      className={`
-        place-card-dark shrink-0 w-48 rounded-2xl border border-white/10 overflow-hidden mx-2
-        bg-gradient-to-br ${place.gradient} shadow-xl
-      `}
+      className={`shrink-0 w-44 sm:w-48 rounded-2xl border border-white/10 overflow-hidden bg-gradient-to-br ${grad} shadow-xl select-none`}
     >
-      {/* ── Photo section ── */}
       <div className="relative h-32 overflow-hidden">
-        {/* Gradient fallback always rendered underneath */}
-        <div className={`absolute inset-0 bg-gradient-to-br ${place.gradient}`} />
-
-        {/* Real photo */}
+        <div className={`absolute inset-0 bg-gradient-to-br ${grad}`} />
         {photo && (
-          /* eslint-disable-next-line @next/next/no-img-element */
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={photo}
             alt={place.landmark}
             loading="eager"
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
-              imgLoaded ? "opacity-80" : "opacity-0"
-            }`}
+            draggable={false}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${imgLoaded ? "opacity-80" : "opacity-0"}`}
             onLoad={() => setImgLoaded(true)}
             onError={() => setImgLoaded(false)}
           />
         )}
-
-        {/* Dark overlay for text legibility */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/10" />
-
-        {/* Top row: flag + confidence */}
+        {theme === "dark" && <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/10" />}
         <div className="absolute top-2.5 left-3 right-3 flex items-center justify-between">
           <span className="text-xl leading-none drop-shadow">{place.flag}</span>
           <div
-            className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
-            style={{ background: `${place.accent}30`, border: `1px solid ${place.accent}50` }}
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+            style={{
+              color: theme === "light" ? place.accent : "#fff",
+              background: `${place.accent}25`,
+              border: `1px solid ${place.accent}60`,
+            }}
           >
             <span style={{ color: place.accent }}>✦</span>
             {place.confidence}%
           </div>
         </div>
-
-        {/* Landmark name at bottom of photo */}
         <div className="absolute bottom-2.5 left-3 right-3">
-          <p className="text-sm font-bold text-white leading-tight drop-shadow-lg">
+          <p className="text-sm font-bold leading-tight drop-shadow-lg"
+            style={{ color: theme === "light" ? "#1e293b" : "#fff" }}>
             {place.landmark}
           </p>
         </div>
       </div>
-
-      {/* ── Info section ── */}
       <div className="px-3 py-2.5">
-        <p className="text-[11px] text-white/50 mb-2">
+        <p className="text-[11px] mb-2" style={{ color: theme === "light" ? "#64748b" : "rgba(255,255,255,0.5)" }}>
           {place.city} · {place.country}
         </p>
-
-        {/* Confidence bar */}
-        <div className="h-[3px] bg-white/10 rounded-full overflow-hidden mb-2">
-          <div
-            className="h-full rounded-full transition-all duration-1000"
-            style={{ width: `${place.confidence}%`, background: place.accent }}
-          />
+        <div className="h-[3px] rounded-full overflow-hidden mb-2" style={{ background: theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.1)" }}>
+          <div className="h-full rounded-full" style={{ width: `${place.confidence}%`, background: place.accent }} />
         </div>
-
-        {/* Coordinates */}
-        <p className="text-[9px] font-mono text-white/25 tabular-nums leading-relaxed">
+        <p className="text-[9px] font-mono tabular-nums leading-relaxed"
+          style={{ color: theme === "light" ? "#94a3b8" : "rgba(255,255,255,0.25)" }}>
           {place.lat}<br />{place.lng}
         </p>
       </div>
@@ -209,10 +214,17 @@ function PlaceCard({
 
 export default function ExamplePlaces() {
   const [photos, setPhotos] = useState<Record<string, string>>({});
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const interacting = useRef(false);
+  const lastTime = useRef<number | null>(null);
+  const accumulator = useRef(0);
+  const dragStartX = useRef(0);
+  const dragScrollLeft = useRef(0);
+  const isDragging = useRef(false);
 
+  // Fetch Wikipedia photos
   useEffect(() => {
     let active = true;
-
     Promise.all(
       PLACES.map(async (place) => {
         try {
@@ -231,14 +243,62 @@ export default function ExamplePlaces() {
     ).then((results) => {
       if (!active) return;
       const map: Record<string, string> = {};
-      for (const r of results) {
-        if (r) map[r[0]] = r[1];
-      }
+      for (const r of results) { if (r) map[r[0]] = r[1]; }
       setPhotos(map);
     });
-
     return () => { active = false; };
   }, []);
+
+  // Auto-scroll via rAF — pauses when user is interacting
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let raf: number;
+
+    const step = (time: number) => {
+      if (lastTime.current !== null) {
+        const delta = time - lastTime.current;
+        if (!interacting.current) {
+          // Accumulate fractional pixels so sub-pixel amounts aren't lost
+          accumulator.current += delta * 0.05; // ~50px/s
+          const pixels = Math.floor(accumulator.current);
+          if (pixels >= 1) {
+            el.scrollLeft += pixels;
+            accumulator.current -= pixels;
+            // Seamless loop: once past the first copy, reset to start
+            if (el.scrollLeft >= el.scrollWidth / 2) {
+              el.scrollLeft = 0;
+            }
+          }
+        }
+      }
+      lastTime.current = time;
+      raf = requestAnimationFrame(step);
+    };
+
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // Mouse drag handlers
+  const onMouseDown = (e: React.MouseEvent) => {
+    isDragging.current = true;
+    interacting.current = true;
+    dragStartX.current = e.pageX - (scrollRef.current?.offsetLeft ?? 0);
+    dragScrollLeft.current = scrollRef.current?.scrollLeft ?? 0;
+  };
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    scrollRef.current.scrollLeft = dragScrollLeft.current - (x - dragStartX.current);
+  };
+  const onMouseUp = () => { isDragging.current = false; };
+  const onMouseLeave = () => {
+    isDragging.current = false;
+    interacting.current = false;
+  };
+  const onMouseEnter = () => { interacting.current = true; };
 
   return (
     <div className="w-full mt-10">
@@ -246,12 +306,27 @@ export default function ExamplePlaces() {
         Places GeoLook has identified
       </p>
 
-      <div className="marquee-wrap">
-        <div className="marquee-track">
-          {ALL.map((place, i) => (
-            <PlaceCard key={i} place={place} photo={photos[place.landmark]} />
-          ))}
-        </div>
+      <div
+        ref={scrollRef}
+        className="flex gap-3 px-4 overflow-x-auto pb-2"
+        style={{
+          cursor: "grab",
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+          WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)",
+          maskImage: "linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)",
+        }}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+        onTouchStart={() => { interacting.current = true; }}
+        onTouchEnd={() => { interacting.current = false; }}
+      >
+        {ALL.map((place, i) => (
+          <PlaceCard key={i} place={place} photo={photos[place.landmark]} />
+        ))}
       </div>
     </div>
   );

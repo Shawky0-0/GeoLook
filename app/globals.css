@@ -348,6 +348,16 @@ div[style*="z-index:10000"][style*="background"] {
   mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
 }
 
+/* ─── Hero ambient animations ───────────────────── */
+@keyframes auroraShift {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+@keyframes heroCoordFloat {
+  0%, 100% { opacity: 0; transform: translateY(6px); }
+  30%, 70%  { opacity: 1; transform: translateY(0); }
+}
+
 /* ─── Dark mode defaults (explicit) ─────────────── */
 :root, [data-theme="dark"] {
   color-scheme: dark;
@@ -508,6 +518,17 @@ div[style*="z-index:10000"][style*="background"] {
 /* ─── Light mode: divide color ─── */
 [data-theme="light"] .divide-white\/\[0\.04\] > * + * { border-color: rgba(0,0,0,0.07); }
 
+
+/* ─── Light mode: hero background ───────────────────── */
+[data-theme="light"] .hero-dots {
+  background-image: radial-gradient(circle, rgba(30,64,175,0.18) 1px, transparent 1px) !important;
+}
+[data-theme="light"] .hero-aurora {
+  background: linear-gradient(135deg, rgba(59,130,246,0.10) 0%, rgba(139,92,246,0.07) 40%, rgba(6,182,212,0.09) 100%) !important;
+}
+[data-theme="light"] .hero-coord {
+  color: rgba(71,85,105,0.35) !important;
+}
 
 /* ─── Light mode: place cards stay dark (photo cards) ─── */
 [data-theme="light"] .place-card-dark .text-white { color: #ffffff; }

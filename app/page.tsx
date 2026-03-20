@@ -169,7 +169,44 @@ export default function HomePage() {
 
         {/* ════════════════ HERO (idle only) ════════════════ */}
         {analysisState === "idle" && (
-          <div className="text-center mb-10 animate-fade-up">
+          <div className="relative text-center mb-10 animate-fade-up overflow-hidden">
+
+            {/* ── Hero ambient background ── */}
+            <div className="absolute inset-0 pointer-events-none select-none overflow-hidden" aria-hidden>
+
+              {/* Dot grid pattern */}
+              <div className="hero-dots absolute inset-0" style={{
+                backgroundImage: "radial-gradient(circle, rgba(96,165,250,0.35) 1px, transparent 1px)",
+                backgroundSize: "36px 36px",
+                WebkitMaskImage: "radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 80%)",
+                maskImage: "radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 80%)",
+              }} />
+
+              {/* Color aurora behind the dots */}
+              <div className="hero-aurora absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                style={{
+                  width: "90%", height: "90%",
+                  background: "linear-gradient(135deg, rgba(59,130,246,0.18) 0%, rgba(139,92,246,0.14) 40%, rgba(6,182,212,0.16) 100%)",
+                  backgroundSize: "200% 200%",
+                  filter: "blur(48px)",
+                  animation: "auroraShift 12s ease-in-out infinite",
+                  borderRadius: "50%",
+                }}
+              />
+
+              {/* Floating coords */}
+              {[
+                { text: "48.8566°N · 2.3522°E",  left: "2%",  top: "10%", delay: "0s"   },
+                { text: "35.6762°N · 139.65°E",  left: "66%", top: "6%",  delay: "3s"   },
+                { text: "40.7128°N · 74.006°W",  left: "72%", top: "82%", delay: "1.5s" },
+                { text: "51.5074°N · 0.1278°W",  left: "1%",  top: "82%", delay: "4.5s" },
+              ].map(({ text, left, top, delay }, i) => (
+                <span key={i} className="hero-coord absolute font-mono text-[8px] tabular-nums hidden sm:block"
+                  style={{ left, top, color: "rgba(148,163,184,0.30)", animation: `heroCoordFloat 9s ease-in-out ${delay} infinite` }}>
+                  {text}
+                </span>
+              ))}
+            </div>
             {/* Badge */}
             <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold px-4 py-2 rounded-full mb-6">
               <Sparkles className="w-3.5 h-3.5" />
