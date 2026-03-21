@@ -213,9 +213,17 @@ function PlaceCard({ place, photo }: { place: Place; photo: string | undefined }
 
 export default function ExamplePlaces() {
   const [photos, setPhotos] = useState<Record<string, string>>({});
-  const [paused, setPaused] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const interacting = useRef(false);
+  const lastTime = useRef<number | null>(null);
+  const accumulator = useRef(0);
   const touchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Mouse drag
+  const isDragging = useRef(false);
+  const dragStartX = useRef(0);
+  const dragScrollLeft = useRef(0);
 
+  // Fetch Wikipedia photos
   useEffect(() => {
     let active = true;
     Promise.all(
@@ -242,14 +250,78 @@ export default function ExamplePlaces() {
     return () => { active = false; };
   }, []);
 
-  const handleTouchStart = () => {
-    if (touchTimer.current) clearTimeout(touchTimer.current);
-    setPaused(true);
-  };
+  // Passive touch listeners — lets browser optimize native scroll
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
 
-  const handleTouchEnd = () => {
-    touchTimer.current = setTimeout(() => setPaused(false), 1600);
+    const onTouchStart = () => {
+      if (touchTimer.current) clearTimeout(touchTimer.current);
+      interacting.current = true;
+    };
+    const onTouchEnd = () => {
+      // Delay to let momentum scrolling finish before auto-scroll resumes
+      touchTimer.current = setTimeout(() => {
+        interacting.current = false;
+        lastTime.current = null; // reset so delta doesn't spike on resume
+      }, 1800);
+    };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    el.addEventListener("touchcancel", onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, []);
+
+  // Auto-scroll via rAF — only runs when not interacting
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let raf: number;
+
+    const step = (time: number) => {
+      if (lastTime.current !== null && !interacting.current) {
+        const delta = Math.min(time - lastTime.current, 100); // cap to avoid jump after tab switch
+        accumulator.current += delta * 0.05; // ~50px/s
+        const pixels = Math.floor(accumulator.current);
+        if (pixels >= 1) {
+          el.scrollLeft += pixels;
+          accumulator.current -= pixels;
+          // Seamless loop
+          if (el.scrollLeft >= el.scrollWidth / 2) {
+            el.scrollLeft -= el.scrollWidth / 2;
+            accumulator.current = 0;
+          }
+        }
+      }
+      lastTime.current = time;
+      raf = requestAnimationFrame(step);
+    };
+
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // Mouse drag handlers (desktop)
+  const onMouseDown = (e: React.MouseEvent) => {
+    isDragging.current = true;
+    interacting.current = true;
+    dragStartX.current = e.pageX - (scrollRef.current?.offsetLeft ?? 0);
+    dragScrollLeft.current = scrollRef.current?.scrollLeft ?? 0;
   };
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    scrollRef.current.scrollLeft = dragScrollLeft.current - (x - dragStartX.current);
+  };
+  const onMouseUp = () => { isDragging.current = false; };
+  const onMouseEnter = () => { interacting.current = true; };
+  const onMouseLeave = () => { isDragging.current = false; interacting.current = false; };
 
   return (
     <div className="w-full mt-10">
@@ -257,23 +329,25 @@ export default function ExamplePlaces() {
         Places GeoLook has identified
       </p>
 
-      <div className="marquee-wrap">
-        <div
-          className="marquee-track"
-          style={{
-            gap: 12,
-            paddingLeft: 16,
-            animationPlayState: paused ? "paused" : "running",
-          }}
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          {ALL.map((place, i) => (
-            <PlaceCard key={i} place={place} photo={photos[place.landmark]} />
-          ))}
-        </div>
+      <div
+        ref={scrollRef}
+        className="flex gap-3 px-4 overflow-x-auto pb-2"
+        style={{
+          cursor: isDragging.current ? "grabbing" : "grab",
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+          WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)",
+          maskImage: "linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)",
+        }}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+      >
+        {ALL.map((place, i) => (
+          <PlaceCard key={i} place={place} photo={photos[place.landmark]} />
+        ))}
       </div>
     </div>
   );
