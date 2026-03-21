@@ -273,6 +273,10 @@ export default function ExamplePlaces() {
         style={{
           overflow: "hidden",
           cursor: "grab",
+          // pan-y = browser keeps vertical page scroll, our JS owns horizontal
+          // Without this, iOS intercepts horizontal swipes for its own scroll pipeline
+          // causing our JS updates to fight the browser → jank on iPhone
+          touchAction: "pan-y",
           WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)",
           maskImage: "linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)",
         }}
