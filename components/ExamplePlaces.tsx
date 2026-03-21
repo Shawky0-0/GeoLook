@@ -3,17 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 
 interface Place {
-  landmark: string;
-  city: string;
-  country: string;
-  flag: string;
-  confidence: number;
-  lat: string;
-  lng: string;
-  gradient: string;
-  lightGradient: string;
-  accent: string;
-  wikiTitle: string;
+  landmark: string; city: string; country: string; flag: string; confidence: number;
+  lat: string; lng: string; gradient: string; lightGradient: string; accent: string; wikiTitle: string;
 }
 
 const PLACES: Place[] = [
@@ -26,6 +17,9 @@ const PLACES: Place[] = [
   { landmark: "Blue Mosque", city: "Istanbul", country: "Turkey", flag: "🇹🇷", confidence: 91, lat: "41.0054° N", lng: "28.9768° E", gradient: "from-emerald-950 to-green-950", lightGradient: "from-emerald-100 to-green-100", accent: "#34d399", wikiTitle: "Sultan Ahmed Mosque" },
   { landmark: "Sagrada Família", city: "Barcelona", country: "Spain", flag: "🇪🇸", confidence: 97, lat: "41.4036° N", lng: "2.1744° E", gradient: "from-orange-950 to-red-950", lightGradient: "from-orange-100 to-red-100", accent: "#fb923c", wikiTitle: "Sagrada Família" },
 ];
+
+// CSS animation duration — must match marquee-left in globals.css
+const ANIM_DUR = 35;
 
 const ALL = [...PLACES, ...PLACES];
 
@@ -55,7 +49,6 @@ function PlaceCard({ place, photo }: { place: Place; photo: string | undefined }
   }, [photo]);
 
   const grad = theme === "light" ? place.lightGradient : place.gradient;
-
   return (
     <div className={`shrink-0 w-44 sm:w-48 rounded-2xl border border-white/10 overflow-hidden bg-gradient-to-br ${grad} shadow-xl select-none`}>
       <div className="relative h-32 overflow-hidden">
@@ -93,24 +86,25 @@ function PlaceCard({ place, photo }: { place: Place; photo: string | undefined }
 
 export default function ExamplePlaces() {
   const [photos, setPhotos] = useState<Record<string, string>>({});
-  const wrapRef = useRef<HTMLDivElement>(null);   // overflow:hidden wrapper
-  const trackRef = useRef<HTMLDivElement>(null);  // the moving flex strip
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
 
-  // All motion state — never touches scrollLeft
-  const posX = useRef(0);          // current translateX (negative = moved left)
-  const halfW = useRef(0);         // width of one card set (for loop)
-  const velocity = useRef(0);      // px/ms — used for momentum after touch
-  const touching = useRef(false);
-  const interacting = useRef(false);
+  // Motion state
+  const mode = useRef<"css" | "js">("css");
+  const posX = useRef(0);
+  const halfW = useRef(0);
+  const velocity = useRef(0);
   const lastTouchX = useRef(0);
   const lastTouchTime = useRef(0);
-  const lastRaf = useRef<number | null>(null);
-  const lastTime = useRef<number | null>(null);
+  const touching = useRef(false);
+  const rafRef = useRef<number | null>(null);
+  const lastRafTime = useRef<number | null>(null);
+  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Mouse drag
   const mouseDown = useRef(false);
   const lastMouseX = useRef(0);
 
-  // Fetch Wikipedia photos
+  // Fetch photos
   useEffect(() => {
     let active = true;
     Promise.all(PLACES.map(async (p) => {
@@ -121,16 +115,16 @@ export default function ExamplePlaces() {
         const src = d?.thumbnail?.source as string | undefined;
         return src ? [p.landmark, src] as [string, string] : null;
       } catch { return null; }
-    })).then((results) => {
+    })).then((rs) => {
       if (!active) return;
       const map: Record<string, string> = {};
-      for (const r of results) { if (r) map[r[0]] = r[1]; }
+      for (const r of rs) { if (r) map[r[0]] = r[1]; }
       setPhotos(map);
     });
     return () => { active = false; };
   }, []);
 
-  // Measure the half-width once track renders
+  // Measure half-width
   useEffect(() => {
     const track = trackRef.current;
     if (!track) return;
@@ -141,56 +135,80 @@ export default function ExamplePlaces() {
     return () => ro.disconnect();
   }, []);
 
-  // Main animation loop + touch/mouse listeners
+  // Switch CSS animation → JS transform
+  // Reads current animated pixel position from computed style so there's no jump
+  const switchToJS = () => {
+    const track = trackRef.current;
+    if (!track || mode.current === "js") return;
+    const matrix = new DOMMatrix(getComputedStyle(track).transform);
+    posX.current = matrix.m41; // current translateX in pixels
+    track.style.animation = "none";
+    track.style.transform = `translate3d(${posX.current}px,0,0)`;
+    mode.current = "js";
+  };
+
+  // Switch JS transform → CSS animation, resuming from current pixel position
+  const switchToCSS = () => {
+    const track = trackRef.current;
+    if (!track || mode.current === "css") return;
+    const hw = halfW.current;
+    if (hw <= 0) return;
+    // Normalise into [-halfW, 0]
+    let p = posX.current % hw;
+    if (p > 0) p -= hw;
+    // progress 0→1 through one loop
+    const progress = Math.abs(p) / hw;
+    const delay = -(progress * ANIM_DUR);
+    track.style.transform = "";
+    track.style.animation = `marquee-left ${ANIM_DUR}s ${delay}s linear infinite`;
+    mode.current = "css";
+  };
+
+  // JS rAF loop — handles drag + momentum, then hands back to CSS
   useEffect(() => {
     const wrap = wrapRef.current;
     const track = trackRef.current;
     if (!wrap || !track) return;
 
     const commit = () => {
-      // Seamless loop
-      if (halfW.current > 0 && posX.current <= -halfW.current) {
-        posX.current += halfW.current;
-      }
-      // translate3d forces a GPU compositing layer (smoother than translateX on mobile)
+      if (halfW.current > 0 && posX.current <= -halfW.current) posX.current += halfW.current;
       track.style.transform = `translate3d(${posX.current}px,0,0)`;
     };
 
     const step = (now: number) => {
-      if (lastTime.current !== null) {
-        const dt = Math.min(now - lastTime.current, 64);
-
-        if (!touching.current) {
+      if (mode.current === "js" && !touching.current) {
+        if (lastRafTime.current !== null) {
+          const dt = Math.min(now - lastRafTime.current, 64);
           if (Math.abs(velocity.current) > 0.02) {
-            // momentum after finger lifts
             posX.current += velocity.current * dt;
-            velocity.current *= Math.pow(0.94, dt / 16);
+            velocity.current *= Math.pow(0.93, dt / 16);
             if (Math.abs(velocity.current) < 0.02) {
               velocity.current = 0;
-              interacting.current = false;
+              // Momentum done — hand back to CSS compositor
+              switchToCSS();
+              lastRafTime.current = null;
+              rafRef.current = requestAnimationFrame(step);
+              return;
             }
-          } else if (!interacting.current) {
-            // auto-scroll ~48px/s
-            posX.current -= dt * 0.048;
+            commit();
           }
         }
-        // ── Single DOM write per frame — always here, never in event handlers ──
-        commit();
+        lastRafTime.current = now;
       }
-      lastTime.current = now;
-      lastRaf.current = requestAnimationFrame(step);
+      rafRef.current = requestAnimationFrame(step);
     };
 
-    lastRaf.current = requestAnimationFrame(step);
+    rafRef.current = requestAnimationFrame(step);
 
-    // ── Touch ──────────────────────────────────────────────
+    // ── Touch handlers ────────────────────────────────────
     const onTouchStart = (e: TouchEvent) => {
+      if (resumeTimer.current) clearTimeout(resumeTimer.current);
       touching.current = true;
-      interacting.current = true;
       velocity.current = 0;
+      switchToJS();
       lastTouchX.current = e.touches[0].clientX;
       lastTouchTime.current = performance.now();
-      lastTime.current = null; // reset rAF timer so dt doesn't spike
+      lastRafTime.current = null;
     };
 
     const onTouchMove = (e: TouchEvent) => {
@@ -198,9 +216,8 @@ export default function ExamplePlaces() {
       const now = performance.now();
       const dx = x - lastTouchX.current;
       const dt = now - lastTouchTime.current;
-
-      // Only update the ref — rAF will write to DOM on next frame
       posX.current += dx;
+      commit(); // safe: we're already on main thread during touchmove, synced here
       if (dt > 0) velocity.current = dx / dt;
       lastTouchX.current = x;
       lastTouchTime.current = now;
@@ -208,34 +225,36 @@ export default function ExamplePlaces() {
 
     const onTouchEnd = () => {
       touching.current = false;
-      // velocity carries into momentum in the rAF loop
-      // interacting stays true until momentum settles
+      if (Math.abs(velocity.current) < 0.05) {
+        // No momentum — go straight back to CSS after a short pause
+        resumeTimer.current = setTimeout(switchToCSS, 600);
+      }
+      // else: rAF momentum loop will call switchToCSS when it settles
     };
 
-    // ── Mouse drag ─────────────────────────────────────────
+    // ── Mouse drag (desktop) ──────────────────────────────
     const onMouseDown = (e: MouseEvent) => {
       mouseDown.current = true;
-      interacting.current = true;
       velocity.current = 0;
+      switchToJS();
       lastMouseX.current = e.clientX;
       wrap.style.cursor = "grabbing";
     };
     const onMouseMove = (e: MouseEvent) => {
       if (!mouseDown.current) return;
-      // Only update ref — rAF handles DOM
       posX.current += e.clientX - lastMouseX.current;
       lastMouseX.current = e.clientX;
+      commit();
     };
     const onMouseUp = () => {
       mouseDown.current = false;
-      interacting.current = false;
       wrap.style.cursor = "grab";
+      resumeTimer.current = setTimeout(switchToCSS, 700);
     };
     const onMouseLeave = () => {
-      if (mouseDown.current) { mouseDown.current = false; interacting.current = false; wrap.style.cursor = "grab"; }
-      else { interacting.current = false; }
+      if (mouseDown.current) { mouseDown.current = false; wrap.style.cursor = "grab"; }
+      resumeTimer.current = setTimeout(switchToCSS, 700);
     };
-    const onMouseEnter = () => { interacting.current = true; };
 
     wrap.addEventListener("touchstart", onTouchStart, { passive: true });
     wrap.addEventListener("touchmove", onTouchMove, { passive: true });
@@ -245,10 +264,10 @@ export default function ExamplePlaces() {
     wrap.addEventListener("mousemove", onMouseMove);
     wrap.addEventListener("mouseup", onMouseUp);
     wrap.addEventListener("mouseleave", onMouseLeave);
-    wrap.addEventListener("mouseenter", onMouseEnter);
 
     return () => {
-      if (lastRaf.current) cancelAnimationFrame(lastRaf.current);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (resumeTimer.current) clearTimeout(resumeTimer.current);
       wrap.removeEventListener("touchstart", onTouchStart);
       wrap.removeEventListener("touchmove", onTouchMove);
       wrap.removeEventListener("touchend", onTouchEnd);
@@ -257,7 +276,6 @@ export default function ExamplePlaces() {
       wrap.removeEventListener("mousemove", onMouseMove);
       wrap.removeEventListener("mouseup", onMouseUp);
       wrap.removeEventListener("mouseleave", onMouseLeave);
-      wrap.removeEventListener("mouseenter", onMouseEnter);
     };
   }, []);
 
@@ -267,25 +285,10 @@ export default function ExamplePlaces() {
         Places GeoLook has identified
       </p>
 
-      {/* overflow:hidden — no scrollbar, no scrollLeft */}
-      <div
-        ref={wrapRef}
-        style={{
-          overflow: "hidden",
-          cursor: "grab",
-          // pan-y = browser keeps vertical page scroll, our JS owns horizontal
-          // Without this, iOS intercepts horizontal swipes for its own scroll pipeline
-          // causing our JS updates to fight the browser → jank on iPhone
-          touchAction: "pan-y",
-          WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)",
-          maskImage: "linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)",
-        }}
-      >
-        {/* The moving strip — only transform:translateX is ever changed */}
-        <div
-          ref={trackRef}
-          style={{ display: "flex", gap: 12, paddingLeft: 16, paddingBottom: 8, willChange: "transform" }}
-        >
+      {/* marquee-wrap = overflow:hidden + mask */}
+      <div ref={wrapRef} className="marquee-wrap" style={{ cursor: "grab", touchAction: "pan-y" }}>
+        {/* marquee-track = CSS animation by default; overridden inline when user drags */}
+        <div ref={trackRef} className="marquee-track" style={{ gap: 12, paddingLeft: 16, willChange: "transform" }}>
           {ALL.map((place, i) => (
             <PlaceCard key={i} place={place} photo={photos[place.landmark]} />
           ))}
