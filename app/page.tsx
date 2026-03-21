@@ -13,6 +13,8 @@ import TerminalDemo from "@/components/TerminalDemo";
 import { GeoResult, AnalysisState } from "@/types";
 import { getPlaceInfo, WikiInfo } from "@/lib/wikipedia";
 import { compressImageForUpload } from "@/lib/compress";
+import { saveToHistory } from "@/lib/history";
+import DiscoveryHistory from "@/components/DiscoveryHistory";
 
 const MapView = dynamic(() => import("@/components/MapView"), {
   ssr: false,
@@ -46,6 +48,7 @@ export default function HomePage() {
   const [selectedAltIndex, setSelectedAltIndex] = useState<number | undefined>(undefined);
   const [wikiInfo, setWikiInfo] = useState<WikiInfo | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [historyKey, setHistoryKey] = useState(0);
 
   // Fetch Wikipedia info whenever a result arrives
   useEffect(() => {
@@ -122,8 +125,19 @@ export default function HomePage() {
         return;
       }
 
-      setResult(parsedData as unknown as GeoResult);
+      const geoResult = parsedData as unknown as GeoResult;
+      setResult(geoResult);
       setAnalysisState("done");
+      // Persist to local history (no account needed)
+      saveToHistory({
+        landmark: geoResult.location.landmark,
+        city: geoResult.location.city,
+        country: geoResult.location.country,
+        lat: geoResult.location.coordinates.lat,
+        lng: geoResult.location.coordinates.lng,
+        confidence: geoResult.location.confidence,
+      });
+      setHistoryKey((k) => k + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error. Check your connection.");
       setErrorSuggestion("Make sure the server is running and your API key is configured.");
@@ -250,6 +264,9 @@ export default function HomePage() {
 
             {/* Scrolling example places */}
             <ExamplePlaces />
+
+            {/* Your past discoveries (localStorage) */}
+            <DiscoveryHistory refreshKey={historyKey} />
           </div>
         )}
 
