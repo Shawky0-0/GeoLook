@@ -142,6 +142,10 @@ export default function MapView({ result, state }: MapViewProps) {
     const shuffled = [...SCAN_LOCATIONS].sort(() => Math.random() - 0.5);
     scanIndexRef.current = 0;
 
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+    const flyDuration = isMobile ? 1000 : 1600;
+    const scanInterval = isMobile ? 3200 : 2600;
+
     const flyNext = () => {
       const loc = shuffled[scanIndexRef.current % shuffled.length];
       scanIndexRef.current++;
@@ -150,15 +154,15 @@ export default function MapView({ result, state }: MapViewProps) {
       mapRef.current?.flyTo({
         center: [loc.lng, loc.lat],
         zoom: loc.zoom,
-        duration: 1800,
+        duration: flyDuration,
         essential: true,
       });
     };
 
     // Fly to world view first, then start scanning
-    mapRef.current?.flyTo({ center: [0, 20], zoom: 2, duration: 600, essential: true });
-    const kickoff = setTimeout(flyNext, 700);
-    scanIntervalRef.current = setInterval(flyNext, 2600);
+    mapRef.current?.flyTo({ center: [0, 20], zoom: 2, duration: 500, essential: true });
+    const kickoff = setTimeout(flyNext, 600);
+    scanIntervalRef.current = setInterval(flyNext, scanInterval);
 
     return () => {
       clearTimeout(kickoff);
@@ -172,9 +176,9 @@ export default function MapView({ result, state }: MapViewProps) {
     const { lat, lng } = result.location.coordinates;
     const zoom = getZoomFromRadius(result.location.radius_km);
     setPopupInfo(null);
-    // Small delay to let the map initialise on first render
     const t = setTimeout(() => {
-      mapRef.current?.flyTo({ center: [lng, lat], zoom, duration: 1400, essential: true });
+      const dur = typeof window !== "undefined" && window.innerWidth < 640 ? 900 : 1400;
+      mapRef.current?.flyTo({ center: [lng, lat], zoom, duration: dur, essential: true });
     }, 50);
     return () => clearTimeout(t);
   }, [result?.location.coordinates.lat, result?.location.coordinates.lng]); // eslint-disable-line

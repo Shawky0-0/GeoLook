@@ -313,6 +313,7 @@ export default function ExamplePlaces() {
           cursor: "grab",
           scrollbarWidth: "none",
           msOverflowStyle: "none",
+          touchAction: "pan-x",
           WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)",
           maskImage: "linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)",
         }}
@@ -322,7 +323,10 @@ export default function ExamplePlaces() {
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onTouchStart={() => { interacting.current = true; }}
-        onTouchEnd={() => { interacting.current = false; }}
+        onTouchEnd={() => {
+          // Wait for momentum scrolling to finish before resuming auto-scroll
+          setTimeout(() => { interacting.current = false; }, 1800);
+        }}
       >
         {ALL.map((place, i) => (
           <PlaceCard key={i} place={place} photo={photos[place.landmark]} />
