@@ -148,33 +148,34 @@ export default function ExamplePlaces() {
     if (!wrap || !track) return;
 
     const commit = () => {
-      // Seamless loop — when we've moved left by a full set width, jump back
+      // Seamless loop
       if (halfW.current > 0 && posX.current <= -halfW.current) {
         posX.current += halfW.current;
       }
-      track.style.transform = `translateX(${posX.current}px)`;
+      // translate3d forces a GPU compositing layer (smoother than translateX on mobile)
+      track.style.transform = `translate3d(${posX.current}px,0,0)`;
     };
 
     const step = (now: number) => {
       if (lastTime.current !== null) {
-        const dt = Math.min(now - lastTime.current, 64); // cap at ~1 frame
+        const dt = Math.min(now - lastTime.current, 64);
 
-        if (touching.current) {
-          // pure touch — position is updated in onTouchMove, nothing here
-        } else if (Math.abs(velocity.current) > 0.02) {
-          // momentum glide after finger lifts
-          posX.current += velocity.current * dt;
-          velocity.current *= Math.pow(0.94, dt / 16); // friction per frame
-          if (Math.abs(velocity.current) < 0.02) {
-            velocity.current = 0;
-            interacting.current = false;
+        if (!touching.current) {
+          if (Math.abs(velocity.current) > 0.02) {
+            // momentum after finger lifts
+            posX.current += velocity.current * dt;
+            velocity.current *= Math.pow(0.94, dt / 16);
+            if (Math.abs(velocity.current) < 0.02) {
+              velocity.current = 0;
+              interacting.current = false;
+            }
+          } else if (!interacting.current) {
+            // auto-scroll ~48px/s
+            posX.current -= dt * 0.048;
           }
-          commit();
-        } else if (!interacting.current) {
-          // auto-scroll ~48px/s
-          posX.current -= dt * 0.048;
-          commit();
         }
+        // ── Single DOM write per frame — always here, never in event handlers ──
+        commit();
       }
       lastTime.current = now;
       lastRaf.current = requestAnimationFrame(step);
@@ -198,10 +199,8 @@ export default function ExamplePlaces() {
       const dx = x - lastTouchX.current;
       const dt = now - lastTouchTime.current;
 
+      // Only update the ref — rAF will write to DOM on next frame
       posX.current += dx;
-      commit();
-
-      // Rolling velocity estimate (px/ms)
       if (dt > 0) velocity.current = dx / dt;
       lastTouchX.current = x;
       lastTouchTime.current = now;
@@ -223,9 +222,9 @@ export default function ExamplePlaces() {
     };
     const onMouseMove = (e: MouseEvent) => {
       if (!mouseDown.current) return;
+      // Only update ref — rAF handles DOM
       posX.current += e.clientX - lastMouseX.current;
       lastMouseX.current = e.clientX;
-      commit();
     };
     const onMouseUp = () => {
       mouseDown.current = false;
